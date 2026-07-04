@@ -2,7 +2,7 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>🎨 自由畫板</title>
 <style>
 :root{
@@ -64,7 +64,8 @@ main{flex:1;display:flex;min-height:0}
 .tool.active{border-color:var(--accent);background:#f1e8ff}
 .tool.toggled{border-color:#26a69a;background:#e0f7f4}
 /* 畫布 */
-#stage{flex:1;display:flex;align-items:center;justify-content:center;min-width:0;padding:6px}
+#stage{flex:1;display:flex;align-items:center;justify-content:center;min-width:0;padding:6px;overflow:auto}
+#stage.zoomed{align-items:flex-start;justify-content:flex-start}
 #canvasWrap{position:relative;box-shadow:0 8px 30px rgba(60,30,120,.25);border-radius:10px;overflow:hidden}
 #board{display:block;background:#ffffff;touch-action:none;cursor:crosshair}
 /* ── 底部調色盤 ── */
@@ -104,11 +105,11 @@ main{flex:1;display:flex;min-height:0}
   background:linear-gradient(90deg,#f3ebff,#ffe9f2);
 }
 .panel .phead h2{font-size:18px;color:#5a3ea6;flex:1}
-.closeBtn{border:none;background:#fff;border-radius:50%;width:34px;height:34px;font-size:16px;cursor:pointer;box-shadow:var(--shadow);font-weight:700;color:#666}
+.closeBtn{border:none;background:#fff;border-radius:50%;width:44px;height:44px;font-size:18px;cursor:pointer;box-shadow:var(--shadow);font-weight:700;color:#666;flex-shrink:0}
 .panel .pbody{overflow-y:auto;padding:12px 16px}
 /* 印章 */
-#stampTabs{display:flex;gap:6px;padding:0 16px 8px;flex-wrap:wrap;background:linear-gradient(90deg,#f3ebff,#ffe9f2)}
-.stab{border:none;border-radius:999px;padding:6px 14px;font-size:13px;font-weight:700;cursor:pointer;background:#fff;color:#666;font-family:inherit}
+#stampTabs,#colorTabs{display:flex;gap:8px;padding:0 16px 8px;flex-wrap:wrap;background:linear-gradient(90deg,#f3ebff,#ffe9f2)}
+.stab{border:none;border-radius:999px;padding:8px 16px;min-height:40px;font-size:14px;font-weight:700;cursor:pointer;background:#fff;color:#666;font-family:inherit}
 .stab.active{background:var(--accent);color:#fff}
 #stampGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(52px,1fr));gap:4px}
 .stampBtn{border:none;background:#faf7ff;border-radius:10px;font-size:30px;padding:6px 0;cursor:pointer;line-height:1.2}
@@ -116,10 +117,18 @@ main{flex:1;display:flex;min-height:0}
 .stampBtn.active{background:#e2d4ff;outline:3px solid var(--accent)}
 /* 著色本 */
 #pageGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+#photoPanel{display:none;flex-direction:column;gap:10px;margin-bottom:12px}
+#photoPanel.show{display:flex}
+#photoPanel .photoHint{font-size:13px;color:#777;line-height:1.7;background:#faf7ff;border-radius:10px;padding:10px 12px}
+.photoRow{display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+.photoRow label{font-size:13px;font-weight:700;color:#555;display:flex;align-items:center;gap:6px}
+.photoRow input[type=range]{width:120px;accent-color:var(--accent)}
+#photoPreview{width:100%;max-width:600px;border:2px solid #eee;border-radius:10px;align-self:center}
 .pageCard{border:3px solid #eee;border-radius:14px;overflow:hidden;cursor:pointer;background:#fff;text-align:center;transition:transform .1s;font-family:inherit;padding:0}
 .pageCard:hover{transform:scale(1.03);border-color:var(--accent2)}
 .pageCard canvas{width:100%;display:block;background:#fff}
 .pageCard .pname{font-size:14px;font-weight:700;color:#555;padding:6px}
+.pageCard .emThumb{width:100%;aspect-ratio:3/2;display:flex;align-items:center;justify-content:center;font-size:56px;background:#fff;filter:grayscale(1) opacity(.3)}
 /* 作品集 */
 #galleryGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px}
 .workCard{border:3px solid #eee;border-radius:14px;overflow:hidden;background:#fff;position:relative}
@@ -186,8 +195,24 @@ main{flex:1;display:flex;min-height:0}
 <!-- 著色本抽屜 -->
 <div class="drawer" id="coloringDrawer">
   <div class="panel">
-    <div class="phead"><h2>🖍️ 著色本 — 選一張圖，用油漆桶填上顏色！</h2><button class="closeBtn" data-close="coloringDrawer">✕</button></div>
-    <div class="pbody"><div id="pageGrid"></div></div>
+    <div class="phead"><h2 id="coloringTitle">🖍️ 著色本 — 選一張圖，用油漆桶填上顏色！</h2><button class="closeBtn" data-close="coloringDrawer">✕</button></div>
+    <div id="colorTabs"></div>
+    <div class="pbody">
+      <div id="photoPanel">
+        <div class="photoHint">📷 把照片變成黑白線稿著色圖！選一張照片、調整線條細節，按「放到畫布」就能開始著色。照片只在你的電腦上處理，<b>不會上傳到網路</b>。</div>
+        <input type="file" id="photoInput" accept="image/*" hidden>
+        <div class="photoRow"><button class="hbtn" id="photoPick" style="background:#5b8def">📷 選擇照片</button></div>
+        <div id="photoEditor" style="display:none">
+          <canvas id="photoPreview" width="600" height="400"></canvas>
+          <div class="photoRow" style="margin-top:10px">
+            <label>線條細節 <input type="range" id="photoDetail" min="20" max="130" value="75"></label>
+            <label>線條粗細 <input type="range" id="photoThick" min="0" max="3" value="1"></label>
+            <button class="hbtn" id="photoApply" style="background:#26a69a">✅ 放到畫布著色！</button>
+          </div>
+        </div>
+      </div>
+      <div id="pageGrid"></div>
+    </div>
   </div>
 </div>
 
@@ -230,6 +255,7 @@ const TOOLS = [
   { id:"bucket",  ico:"🪣", lbl:"油漆桶" },
   { id:"stamp",   ico:"🧸", lbl:"印章" },
   { id:"eraser",  ico:"🧽", lbl:"橡皮擦" },
+  { id:"hand",    ico:"✋", lbl:"移動" },
 ];
 const toolbar = document.getElementById("toolbar");
 TOOLS.forEach(t => {
@@ -249,12 +275,29 @@ mirrorBtn.addEventListener("click", () => {
   toast(state.mirror ? "對稱模式：開 🦋" : "對稱模式：關");
 });
 toolbar.appendChild(mirrorBtn);
+// 放大鏡：小區域好點（搭配「✋移動」拖動畫布）
+let zoomFactor = 1;
+const ZOOMS = [1, 1.6, 2.4];
+const zoomBtn = document.createElement("button");
+zoomBtn.className = "tool"; zoomBtn.id = "zoomBtn";
+zoomBtn.innerHTML = `<span class="ico">🔍</span><span class="lbl">放大</span>`;
+zoomBtn.addEventListener("click", () => {
+  zoomFactor = ZOOMS[(ZOOMS.indexOf(zoomFactor) + 1) % ZOOMS.length];
+  const stage = document.getElementById("stage");
+  stage.classList.toggle("zoomed", zoomFactor > 1);
+  zoomBtn.classList.toggle("toggled", zoomFactor > 1);
+  zoomBtn.querySelector(".lbl").textContent = zoomFactor > 1 ? `×${zoomFactor}` : "放大";
+  if (zoomFactor === 1) { stage.scrollLeft = 0; stage.scrollTop = 0; }
+  fitCanvas();
+  toast(zoomFactor > 1 ? `放大 ${zoomFactor} 倍！用「✋移動」拖動畫布` : "回到原始大小");
+});
+toolbar.appendChild(zoomBtn);
 
 function setTool(id) {
   state.tool = id;
   document.querySelectorAll(".tool[data-tool]").forEach(b =>
     b.classList.toggle("active", b.dataset.tool === id));
-  canvas.style.cursor = (id === "stamp") ? "copy" : (id === "bucket") ? "cell" : "crosshair";
+  canvas.style.cursor = (id === "stamp") ? "copy" : (id === "bucket") ? "cell" : (id === "hand") ? "grab" : "crosshair";
   if (id === "stamp" && !stampDrawerShown) { openDrawer("stampDrawer"); }
 }
 let stampDrawerShown = false;
@@ -308,28 +351,35 @@ PAPERS.forEach(p => {
 });
 
 /* ══════════════ 復原 / 重做 ══════════════ */
-const undoStack = [], redoStack = [], MAX_UNDO = 30;
-function pushUndo() {
-  undoStack.push(canvas.toDataURL());
+const undoStack = [], redoStack = [], MAX_UNDO = 15;
+// 快照用離屏 canvas（drawImage 是 GPU 端複製，~1-4ms）；toDataURL 的同步 PNG 編碼
+// 每次下筆會卡 50-250ms，且非同步 Image 還原在快按復原時會產生競態
+function snapshotCanvas() {
+  const c = document.createElement("canvas");
+  c.width = W; c.height = H;
+  c.getContext("2d").drawImage(canvas, 0, 0);
+  return c;
+}
+function pushUndo(snap) {
+  undoStack.push(snap || snapshotCanvas());
   if (undoStack.length > MAX_UNDO) undoStack.shift();
   redoStack.length = 0;
   refreshHistoryBtns();
 }
-function restore(url, cb) {
-  const img = new Image();
-  img.onload = () => { ctx.clearRect(0,0,W,H); ctx.drawImage(img,0,0); if (cb) cb(); };
-  img.src = url;
+function restore(snap) {
+  ctx.clearRect(0,0,W,H);
+  ctx.drawImage(snap, 0, 0);
 }
 function doUndo() {
   if (!undoStack.length) return;
-  redoStack.push(canvas.toDataURL());
-  restore(undoStack.pop(), refreshHistoryBtns);
+  redoStack.push(snapshotCanvas());
+  restore(undoStack.pop());
   refreshHistoryBtns();
 }
 function doRedo() {
   if (!redoStack.length) return;
-  undoStack.push(canvas.toDataURL());
-  restore(redoStack.pop(), refreshHistoryBtns);
+  undoStack.push(snapshotCanvas());
+  restore(redoStack.pop());
   refreshHistoryBtns();
 }
 function refreshHistoryBtns() {
@@ -345,7 +395,7 @@ document.getElementById("btnClear").addEventListener("click", () => {
 });
 
 /* ══════════════ 筆刷實作 ══════════════ */
-let drawing = false, lastX = 0, lastY = 0, sprayTimer = null;
+let drawing = false, lastX = 0, lastY = 0, sprayTimer = null, panning = null;
 
 function canvasPos(e) {
   const r = canvas.getBoundingClientRect();
@@ -436,6 +486,23 @@ function floodFill(sx, sy, fillColor) {
   const img = ctx.getImageData(0, 0, W, H);
   const d = img.data;
   const idx = (x, y) => (y * W + x) * 4;
+  // 小朋友常點到黑色輪廓線上：往外找最近的非線條像素當起點（找不到就照原點填，仍可填深色區）
+  const isLine = i => d[i+3] > 200 && Math.max(d[i], d[i+1], d[i+2]) < 80;
+  if (isLine(idx(sx, sy))) {
+    let fx = -1, fy = -1;
+    outer:
+    for (let r = 1; r <= 8; r++) {
+      for (let dy = -r; dy <= r; dy++) {
+        for (let dx = -r; dx <= r; dx++) {
+          if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+          const nx = sx + dx, ny = sy + dy;
+          if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue;
+          if (!isLine(idx(nx, ny))) { fx = nx; fy = ny; break outer; }
+        }
+      }
+    }
+    if (fx >= 0) { sx = fx; sy = fy; }
+  }
   const i0 = idx(sx, sy);
   const tr = d[i0], tg = d[i0+1], tb = d[i0+2], ta = d[i0+3];
   const [fr, fg, fb] = hexToRgb(fillColor);
@@ -657,24 +724,214 @@ const PAGES = [
   });}},
 ];
 
+/* ══════════════ 線稿轉換引擎（彩圖 → 黑線白底著色圖） ══════════════ */
+function boxBlur(a, w, h, r) {
+  if (r <= 0) return;
+  const tmp = new Float32Array(a.length);
+  const div = 2 * r + 1;
+  for (let y = 0; y < h; y++) {           // 水平
+    let sum = 0; const row = y * w;
+    for (let x = -r; x <= r; x++) sum += a[row + Math.min(w - 1, Math.max(0, x))];
+    for (let x = 0; x < w; x++) {
+      tmp[row + x] = sum / div;
+      sum += a[row + Math.min(w - 1, x + r + 1)] - a[row + Math.max(0, x - r)];
+    }
+  }
+  for (let x = 0; x < w; x++) {           // 垂直
+    let sum = 0;
+    for (let y = -r; y <= r; y++) sum += tmp[Math.min(h - 1, Math.max(0, y)) * w + x];
+    for (let y = 0; y < h; y++) {
+      a[y * w + x] = sum / div;
+      sum += tmp[Math.min(h - 1, y + r + 1) * w + x] - tmp[Math.max(0, y - r) * w + x];
+    }
+  }
+}
+function dilateMask(mask, w, h, r) {
+  const out = new Uint8Array(mask.length);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    if (!mask[y * w + x]) continue;
+    for (let dy = -r; dy <= r; dy++) {
+      const yy = y + dy; if (yy < 0 || yy >= h) continue;
+      for (let dx = -r; dx <= r; dx++) {
+        const xx = x + dx; if (xx < 0 || xx >= w) continue;
+        out[yy * w + xx] = 1;
+      }
+    }
+  }
+  return out;
+}
+// mode: "flat"=卡通色塊邊界（emoji 用）；"photo"=灰階+模糊+Sobel（照片用）
+function toLineArt(srcCanvas, mode, opts = {}) {
+  const w = srcCanvas.width, h = srcCanvas.height;
+  const src = srcCanvas.getContext("2d").getImageData(0, 0, w, h).data;
+  let edge = new Uint8Array(w * h);
+  if (mode === "flat") {
+    const tol = opts.tol == null ? 40 : opts.tol, T2 = tol * tol;
+    const d2 = (i, j) => {
+      const dr = src[i]-src[j], dg = src[i+1]-src[j+1], db = src[i+2]-src[j+2];
+      return dr*dr + dg*dg + db*db;
+    };
+    for (let y = 0; y < h - 1; y++) {
+      let i = y * w;
+      for (let x = 0; x < w - 1; x++, i++) {
+        const p = i * 4;
+        if (d2(p, p + 4) > T2 || d2(p, p + w * 4) > T2) edge[i] = 1;
+      }
+    }
+  } else {
+    const gray = new Float32Array(w * h);
+    for (let i = 0, p = 0; i < w * h; i++, p += 4)
+      gray[i] = src[p] * 0.299 + src[p+1] * 0.587 + src[p+2] * 0.114;
+    boxBlur(gray, w, h, opts.blur == null ? 2 : opts.blur);
+    const thr = opts.threshold == null ? 70 : opts.threshold;
+    const T2 = thr * thr;
+    for (let y = 1; y < h - 1; y++) for (let x = 1; x < w - 1; x++) {
+      const i = y * w + x;
+      const gx = -gray[i-w-1] - 2*gray[i-1] - gray[i+w-1] + gray[i-w+1] + 2*gray[i+1] + gray[i+w+1];
+      const gy = -gray[i-w-1] - 2*gray[i-w] - gray[i-w+1] + gray[i+w-1] + 2*gray[i+w] + gray[i+w+1];
+      if (gx*gx + gy*gy > T2) edge[i] = 1;
+    }
+  }
+  const r = opts.dilate == null ? 1 : opts.dilate;
+  if (r > 0) edge = dilateMask(edge, w, h, r);
+  const out = document.createElement("canvas");
+  out.width = w; out.height = h;
+  const octx = out.getContext("2d");
+  const im = octx.createImageData(w, h);
+  const D = im.data;
+  for (let i = 0, p = 0; i < w * h; i++, p += 4) {
+    const v = edge[i] ? 34 : 255;
+    D[p] = D[p+1] = D[p+2] = v; D[p+3] = 255;
+  }
+  octx.putImageData(im, 0, 0);
+  return out;
+}
+function renderEmojiCanvas(emoji, w, h) {
+  const c = document.createElement("canvas");
+  c.width = w; c.height = h;
+  const x = c.getContext("2d", { willReadFrequently: true });
+  x.fillStyle = "#ffffff"; x.fillRect(0, 0, w, h);
+  x.font = `${Math.floor(h * 0.72)}px "Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",sans-serif`;
+  x.textAlign = "center"; x.textBaseline = "middle";
+  x.fillText(emoji, w / 2, h / 2 + h * 0.03);
+  return c;
+}
+function emojiColoringPage(emoji, w = W, h = H, dilate = 2) {
+  return toLineArt(renderEmojiCanvas(emoji, w, h), "flat", { tol: 40, dilate });
+}
+
+/* ══════════════ 著色圖庫（卡通角色線稿） ══════════════ */
+const EMOJI_PAGE_SETS = {
+  "😀 表情臉譜": ["😀","😄","😁","😆","😅","😂","🙂","😉","😊","😇","😍","🥰","😘","😋","😛","😜","🤪","🤗","🤭","🤔","🤨","😏","😴","🤤","😷","🤒","🤕","🤢","🥵","🥶","🤯","🤠","🥳","😎","🤓","🧐","😲","😳","🥺","😨","😢","😭","😱","😤","😡","😈","💀","👻","👽","🤖","🤡","🎃","😺","😸","😻","🙀"],
+  "🧑 人物角色": ["👶","🧒","👦","👧","🧑","👨","👩","🧔","👴","👵","👼","🤴","👸","🤵","👰","🤰","🎅","🤶","🦸","🦹","🧙","🧚","🧛","🧜","🧝","🧞","🧟","💂","👮","👷","🕵️","👳","🧕","💃","🕺","🚶","🏃","🤺","🏇","⛷️","🏂","🏄","🚣","🏊","⛹️","🏋️","🚴","🚵","🤸","🤹","🧘","🛀","👨‍⚕️","👩‍⚕️","👨‍🎓","👩‍🎓","👨‍🏫","👩‍🏫","👨‍🌾","👩‍🌾","👨‍🍳","👩‍🍳","👨‍🔧","👩‍🔧","👨‍🔬","👩‍🔬","👨‍🎤","👩‍🎤","👨‍🎨","👩‍🎨","👨‍✈️","👩‍✈️","👨‍🚀","👩‍🚀","👨‍🚒","👩‍🚒","👨‍💻","👩‍💻"],
+  "🐾 動物王國": ["🐶","🐕","🦮","🐩","🐺","🦊","🦝","🐱","🐈","🦁","🐯","🐅","🐆","🐴","🐎","🦄","🦓","🦌","🐮","🐂","🐃","🐄","🐷","🐖","🐗","🐏","🐑","🐐","🐪","🐫","🦙","🦒","🐘","🦏","🦛","🐭","🐹","🐰","🐇","🐿️","🦔","🦇","🐻","🐨","🐼","🦥","🦦","🦨","🦘","🦡","🦃","🐔","🐓","🐣","🐤","🐥","🐦","🐧","🕊️","🦅","🦆","🦢","🦉","🦩","🦚","🦜","🐸","🐊","🐢","🦎","🐍","🐲","🐉","🦕","🦖","🐳","🐋","🐬","🐟","🐠","🐡","🦈","🐙","🐚","🦀","🦞","🦐","🦑","🐌","🦋","🐛","🐜","🐝","🐞","🦗","🕷️","🦂","🙈","🙉","🙊"],
+  "🍎 美味食物": ["🍏","🍎","🍐","🍊","🍋","🍌","🍉","🍇","🍓","🍈","🍒","🍑","🥭","🍍","🥥","🥝","🍅","🍆","🥑","🥦","🥒","🌶️","🌽","🥕","🥔","🍠","🥐","🍞","🥖","🥨","🧀","🥚","🍳","🥞","🧇","🍗","🍖","🌭","🍔","🍟","🍕","🥪","🌮","🌯","🥗","🍝","🍜","🍲","🍛","🍣","🍱","🥟","🍤","🍙","🍚","🧁","🍰","🎂","🍮","🍭","🍬","🍫","🍿","🍩","🍪","🥛","☕","🧃","🥤","🍦","🍨"],
+  "🚗 交通工具": ["🚗","🚕","🚙","🚌","🚎","🏎️","🚓","🚑","🚒","🚐","🚚","🚛","🚜","🛴","🚲","🛵","🏍️","🛺","🚔","🚍","🚘","🚖","🚡","🚠","🚃","🚋","🚝","🚄","🚅","🚂","🚆","🚇","🚊","🚉","✈️","🛩️","🚀","🛸","🚁","🛶","⛵","🚤","🛥️","🛳️","⛴️","🚢","⚓","🎡","🎢","🎠"],
+  "🌸 花草自然": ["🌵","🎄","🌲","🌳","🌴","🌱","🌿","☘️","🍀","🎍","🍃","🍂","🍁","🍄","🌾","💐","🌷","🌹","🌺","🌸","🌼","🌻","🌞","🌝","🌛","🌜","🌕","🌗","🌙","⭐","🌟","💫","✨","☄️","🪐","🌍","🌈","☀️","⛅","🌧️","⛈️","❄️","☃️","⛄","🌪️","🌊","💧","🔥"],
+  "⚽ 玩具運動": ["⚽","🏀","🏈","⚾","🥎","🎾","🏐","🏉","🥏","🎱","🏓","🏸","🏒","🥍","🥅","⛳","🪁","🏹","🎣","🥊","🥋","🛹","🛷","⛸️","🥌","🎿","🏆","🥇","🥈","🥉","🏅","🎖️","🎪","🎭","🎨","🎬","🎤","🎧","🎹","🥁","🎷","🎺","🎸","🎻","🎲","🎯","🎳","🎮","🧩","🧸","🎈","🎉","🎊","🎁","👑","💎"],
+};
+// 過濾這台裝置畫不出來的組合字（ZWJ 職業字在部分系統會拆成多個字）＋跨分類去重
+(() => {
+  const m = document.createElement("canvas").getContext("2d");
+  m.font = '100px "Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",sans-serif';
+  const seen = new Set();
+  for (const k of Object.keys(EMOJI_PAGE_SETS)) {
+    EMOJI_PAGE_SETS[k] = EMOJI_PAGE_SETS[k].filter(em => {
+      if (seen.has(em)) return false;
+      seen.add(em);
+      const w = m.measureText(em).width;
+      return w > 40 && w < 145; // 太窄=缺字、太寬=拆成多個字
+    });
+  }
+})();
+const TOTAL_PAGES = PAGES.length + Object.values(EMOJI_PAGE_SETS).reduce((a, s) => a + s.length, 0);
+document.getElementById("coloringTitle").textContent = `🖍️ 著色本（共 ${TOTAL_PAGES} 張）— 選一張，用油漆桶上色！`;
+
+/* ── 著色本分頁 ── */
+const CLASSIC_TAB = "🏞️ 經典場景", PHOTO_TAB = "📷 照片變線稿";
+const COLOR_TABS = [CLASSIC_TAB, ...Object.keys(EMOJI_PAGE_SETS), PHOTO_TAB];
+let currentColorTab = CLASSIC_TAB;
+let coloringBuilt = false;
 const pageGrid = document.getElementById("pageGrid");
-PAGES.forEach((p, i) => {
-  const card = document.createElement("button");
-  card.className = "pageCard";
-  const th = document.createElement("canvas");
-  th.width = 300; th.height = 200;
-  const tc = th.getContext("2d");
-  tc.fillStyle = "#fff"; tc.fillRect(0,0,300,200);
-  tc.scale(300 / W, 200 / H);
-  tc.lineWidth = 7 * (W / 300); // 縮圖線條照比例
-  p.draw(tc);
-  card.appendChild(th);
-  const nm = document.createElement("div");
-  nm.className = "pname"; nm.textContent = p.name;
-  card.appendChild(nm);
-  card.addEventListener("click", () => loadColoringPage(i));
-  pageGrid.appendChild(card);
+const thumbCache = new Map();
+const colorTabsEl = document.getElementById("colorTabs");
+COLOR_TABS.forEach(name => {
+  const b = document.createElement("button");
+  b.className = "stab"; b.textContent = name; b.dataset.tab = name;
+  b.addEventListener("click", () => { currentColorTab = name; renderColoringTab(); });
+  colorTabsEl.appendChild(b);
 });
+function renderColoringTab() {
+  document.querySelectorAll("#colorTabs .stab").forEach(t =>
+    t.classList.toggle("active", t.dataset.tab === currentColorTab));
+  document.getElementById("photoPanel").classList.toggle("show", currentColorTab === PHOTO_TAB);
+  pageGrid.innerHTML = "";
+  if (currentColorTab === PHOTO_TAB) return;
+  if (currentColorTab === CLASSIC_TAB) {
+    PAGES.forEach((p, i) => {
+      const card = document.createElement("button");
+      card.className = "pageCard";
+      let th = thumbCache.get("classic:" + i);
+      if (!th) {
+        th = document.createElement("canvas");
+        th.width = 300; th.height = 200;
+        const tc = th.getContext("2d");
+        tc.fillStyle = "#fff"; tc.fillRect(0,0,300,200);
+        tc.scale(300 / W, 200 / H);
+        p.draw(tc);
+        thumbCache.set("classic:" + i, th);
+      }
+      card.appendChild(th);
+      const nm = document.createElement("div");
+      nm.className = "pname"; nm.textContent = p.name;
+      card.appendChild(nm);
+      card.addEventListener("click", () => loadColoringPage(i));
+      pageGrid.appendChild(card);
+    });
+    return;
+  }
+  EMOJI_PAGE_SETS[currentColorTab].forEach(em => {
+    const card = document.createElement("button");
+    card.className = "pageCard"; card.title = em;
+    const cached = thumbCache.get(em);
+    if (cached) {
+      card.appendChild(cached);
+    } else {
+      // 先放灰階 emoji 佔位，縮圖在背景分批生成後換上
+      const ph = document.createElement("div");
+      ph.className = "emThumb"; ph.textContent = em;
+      card.appendChild(ph);
+      queueThumb(em, () => { if (card.isConnected) card.replaceChild(thumbCache.get(em), ph); });
+    }
+    card.addEventListener("click", () => loadEmojiPage(em));
+    pageGrid.appendChild(card);
+  });
+}
+/* 縮圖生成泵：emoji 字型光柵化很貴（~20ms/張），用 MessageChannel 微任務分批做
+   （隱藏分頁也不會像 setTimeout 一樣被節流），每輪 ≤40ms 保持介面流暢 */
+const thumbQueue = [];
+let thumbPumping = false;
+const thumbChannel = new MessageChannel();
+thumbChannel.port1.onmessage = () => {
+  thumbPumping = false;
+  const start = performance.now();
+  while (thumbQueue.length && performance.now() - start < 24) {
+    const job = thumbQueue.shift();
+    if (!thumbCache.has(job.em)) thumbCache.set(job.em, emojiColoringPage(job.em, 180, 120, 1));
+    if (job.apply) job.apply();
+  }
+  if (thumbQueue.length) pumpThumbs();
+};
+function pumpThumbs() {
+  if (thumbPumping) return;
+  thumbPumping = true;
+  thumbChannel.port2.postMessage(0);
+}
+function queueThumb(em, apply) {
+  if (apply) thumbQueue.unshift({ em, apply }); // 畫面上的卡片插隊，背景預熱排後面
+  else thumbQueue.push({ em });
+  pumpThumbs();
+}
 function loadColoringPage(i) {
   pushUndo();
   ctx.clearRect(0,0,W,H);
@@ -684,18 +941,101 @@ function loadColoringPage(i) {
   ctx.restore();
   closeDrawer("coloringDrawer");
   setTool("bucket");
-  toast(`「${PAGES[i].name}」載入完成，用油漆桶點一點就上色！`);
+  toast(`「${PAGES[i].name}」載入完成，用油漆桶上色！（按復原可找回原畫）`);
 }
+function loadEmojiPage(em) {
+  pushUndo();
+  ctx.clearRect(0,0,W,H);
+  ctx.drawImage(emojiColoringPage(em, W, H, 2), 0, 0);
+  closeDrawer("coloringDrawer");
+  setTool("bucket");
+  toast(`${em} 線稿載入完成，用油漆桶上色！（按復原可找回原畫）`);
+}
+
+/* ── 照片變線稿 ── */
+const PHOTO_W = 600, PHOTO_H = 400;
+let photoSrc = null; // 600x400 白底 contain
+const photoPreview = document.getElementById("photoPreview");
+function fitImageToCanvas(img, w, h) {
+  const c = document.createElement("canvas");
+  c.width = w; c.height = h;
+  const x = c.getContext("2d", { willReadFrequently: true });
+  x.fillStyle = "#ffffff"; x.fillRect(0, 0, w, h);
+  const s = Math.min(w / img.naturalWidth, h / img.naturalHeight);
+  const dw = img.naturalWidth * s, dh = img.naturalHeight * s;
+  x.drawImage(img, (w - dw) / 2, (h - dh) / 2, dw, dh);
+  return c;
+}
+function photoParams() {
+  return {
+    threshold: 150 - (+document.getElementById("photoDetail").value),
+    dilate: +document.getElementById("photoThick").value,
+    blur: 2,
+  };
+}
+// 滑桿拖曳時 input 事件連發，用旗標+短計時器合併，最後一次一定會以最新滑桿值重算
+let photoPreviewQueued = false;
+function updatePhotoPreview() {
+  if (!photoSrc || photoPreviewQueued) return;
+  photoPreviewQueued = true;
+  setTimeout(() => {
+    photoPreviewQueued = false;
+    if (!photoSrc) return;
+    const art = toLineArt(photoSrc, "photo", photoParams());
+    photoPreview.getContext("2d").drawImage(art, 0, 0);
+  }, 16);
+}
+document.getElementById("photoPick").addEventListener("click", () =>
+  document.getElementById("photoInput").click());
+document.getElementById("photoInput").addEventListener("change", e => {
+  const file = e.target.files && e.target.files[0];
+  if (!file) return;
+  const url = URL.createObjectURL(file);
+  const img = new Image();
+  img.onload = () => {
+    URL.revokeObjectURL(url);
+    if (!img.naturalWidth || !img.naturalHeight) { toast("這張圖片打不開，換一張試試"); return; }
+    photoSrc = fitImageToCanvas(img, PHOTO_W, PHOTO_H);
+    document.getElementById("photoEditor").style.display = "block";
+    updatePhotoPreview();
+  };
+  img.onerror = () => { URL.revokeObjectURL(url); toast("這張圖片打不開，換一張試試"); };
+  img.src = url;
+  e.target.value = ""; // 同一張可重選
+});
+document.getElementById("photoDetail").addEventListener("input", updatePhotoPreview);
+document.getElementById("photoThick").addEventListener("input", updatePhotoPreview);
+document.getElementById("photoApply").addEventListener("click", () => {
+  if (!photoSrc) return;
+  pushUndo();
+  const art = toLineArt(photoSrc, "photo", photoParams());
+  ctx.save();
+  ctx.imageSmoothingEnabled = false; // 放大 2 倍保持線條銳利，填色才不會漏
+  ctx.clearRect(0,0,W,H);
+  ctx.drawImage(art, 0, 0, W, H);
+  ctx.restore();
+  closeDrawer("coloringDrawer");
+  setTool("bucket");
+  toast("照片線稿完成，用油漆桶上色吧！（按復原可找回原畫）");
+});
 
 /* ══════════════ 畫布事件 ══════════════ */
 canvas.addEventListener("pointerdown", e => {
   e.preventDefault();
   canvas.setPointerCapture(e.pointerId);
   const { x, y } = canvasPos(e);
+  if (state.tool === "hand") {
+    const st = document.getElementById("stage");
+    panning = { x: e.clientX, y: e.clientY, sl: st.scrollLeft, st: st.scrollTop };
+    canvas.style.cursor = "grabbing";
+    return;
+  }
   if (state.tool === "bucket") {
-    pushUndo();
+    const before = snapshotCanvas(); // 先拍快照，填成功才進復原堆疊，無效點擊不清掉重做紀錄
     const ok = floodFill(x, y, state.color);
     if (state.mirror && ok) floodFill(W - x, y, state.color);
+    if (ok) pushUndo(before);
+    else toast("這裡已經是這個顏色囉，換個顏色或換個地方點點看！");
     return;
   }
   if (state.tool === "stamp") {
@@ -711,6 +1051,12 @@ canvas.addEventListener("pointerdown", e => {
   }
 });
 canvas.addEventListener("pointermove", e => {
+  if (panning) {
+    const st = document.getElementById("stage");
+    st.scrollLeft = panning.sl - (e.clientX - panning.x);
+    st.scrollTop  = panning.st - (e.clientY - panning.y);
+    return;
+  }
   if (!drawing) return;
   const { x, y } = canvasPos(e);
   strokeSegment(lastX, lastY, x, y);
@@ -718,11 +1064,11 @@ canvas.addEventListener("pointermove", e => {
 });
 function endStroke() {
   drawing = false;
+  if (panning) { panning = null; if (state.tool === "hand") canvas.style.cursor = "grab"; }
   if (sprayTimer) { clearInterval(sprayTimer); sprayTimer = null; }
 }
 canvas.addEventListener("pointerup", endStroke);
 canvas.addEventListener("pointercancel", endStroke);
-canvas.addEventListener("pointerleave", () => { if (!canvas.hasPointerCapture) endStroke(); });
 
 /* ══════════════ 存檔下載 ══════════════ */
 function compositeCanvas(type = "image/png", q) {
@@ -772,7 +1118,7 @@ function renderGallery() {
       im.onload = () => { ctx.clearRect(0,0,W,H); ctx.drawImage(im,0,0,W,H); };
       im.src = item.img;
       closeDrawer("galleryDrawer");
-      toast("作品已載入，可以繼續畫！");
+      toast("作品已載入，可以繼續畫！（按復原可找回原畫）");
     });
     const del = document.createElement("button");
     del.className = "del"; del.textContent = "✕"; del.title = "刪除這張作品";
@@ -796,6 +1142,12 @@ function openDrawer(id) {
   document.getElementById(id).classList.add("open");
   if (id === "stampDrawer") stampDrawerShown = true;
   if (id === "galleryDrawer") renderGallery();
+  if (id === "coloringDrawer" && !coloringBuilt) {
+    coloringBuilt = true;
+    renderColoringTab();
+    // 第一次打開著色本才開始預熱全部縮圖（畫面上的卡片會插隊優先）
+    Object.keys(EMOJI_PAGE_SETS).forEach(k => EMOJI_PAGE_SETS[k].forEach(em => queueThumb(em)));
+  }
 }
 function closeDrawer(id) { document.getElementById(id).classList.remove("open"); }
 document.getElementById("btnStamps").addEventListener("click", () => openDrawer("stampDrawer"));
@@ -822,7 +1174,7 @@ function fitCanvas() {
   const pad = 16;
   const aw = stage.clientWidth - pad, ah = stage.clientHeight - pad;
   if (aw < 50 || ah < 50) return; // 版面尚未就緒（隱藏視窗載入時尺寸可能為 0）
-  const scale = Math.min(aw / W, ah / H, 1.2);
+  const scale = Math.min(aw / W, ah / H, 1.2) * zoomFactor;
   canvas.style.width = Math.floor(W * scale) + "px";
   canvas.style.height = Math.floor(H * scale) + "px";
 }
@@ -839,7 +1191,7 @@ refreshHistoryBtns();
 fitCanvas();
 
 // 匯出給自動化測試使用
-window.__board = { state, floodFill, placeStamp, loadColoringPage, pushUndo, doUndo, doRedo, canvas, ctx, PAGES, STAMP_SETS };
+window.__board = { state, floodFill, placeStamp, loadColoringPage, loadEmojiPage, emojiColoringPage, toLineArt, renderColoringTab, pushUndo, doUndo, doRedo, canvas, ctx, PAGES, STAMP_SETS, EMOJI_PAGE_SETS, TOTAL_PAGES };
 </script>
 </body>
 </html>
