@@ -3,166 +3,195 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>🎨 自由畫板</title>
+<meta name="theme-color" content="#101013">
+<title>自由畫板 Atelier</title>
 <style>
 :root{
-  --bg:#f0e6ff;
-  --panel:#ffffff;
-  --accent:#7c4dff;
-  --accent2:#ff6ea9;
-  --radius:14px;
-  --shadow:0 4px 14px rgba(80,40,160,.15);
+  --bg0:#101013;          /* 頁面底 */
+  --bg1:#17171c;          /* 面板 */
+  --bg2:#1f1f26;          /* 浮起元素 */
+  --bg3:#26262e;          /* hover */
+  --line:#2c2c35;         /* 邊框 */
+  --line2:#3a3a45;
+  --txt:#e9e7e2;          /* 主文字 */
+  --txt2:#9c9a93;         /* 次文字 */
+  --gold:#c8a468;         /* 主要點綴 */
+  --gold-soft:rgba(200,164,104,.14);
+  --danger:#b8574a;
+  --radius:10px;
+  --shadow:0 6px 24px rgba(0,0,0,.45);
+  --serif:"Noto Serif TC","Songti TC",serif;
 }
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 html,body{height:100%;overflow:hidden}
 body{
   font-family:"Microsoft JhengHei","Segoe UI",system-ui,sans-serif;
-  background:linear-gradient(135deg,#e8f4ff 0%,#f5e9ff 50%,#ffeef5 100%);
+  background:var(--bg0);color:var(--txt);
   display:flex;flex-direction:column;
   user-select:none;touch-action:manipulation;
 }
+::-webkit-scrollbar{width:8px;height:8px}
+::-webkit-scrollbar-thumb{background:var(--line2);border-radius:4px}
+::-webkit-scrollbar-track{background:transparent}
 /* ── 頂部列 ── */
 header{
-  display:flex;align-items:center;gap:8px;
-  padding:8px 12px;flex-wrap:wrap;
-  background:rgba(255,255,255,.75);backdrop-filter:blur(6px);
-  box-shadow:0 2px 8px rgba(0,0,0,.06);z-index:20;
+  display:flex;align-items:center;gap:6px;
+  padding:10px 16px;flex-wrap:wrap;
+  background:var(--bg1);border-bottom:1px solid var(--line);z-index:20;
 }
-header h1{font-size:20px;margin-right:6px;white-space:nowrap;
-  background:linear-gradient(90deg,#7c4dff,#ff6ea9,#ffb400);
-  -webkit-background-clip:text;background-clip:text;color:transparent}
+header h1{
+  font-family:var(--serif);font-size:19px;font-weight:600;letter-spacing:.14em;
+  margin-right:14px;white-space:nowrap;color:var(--txt);
+}
+header h1 em{font-style:normal;color:var(--gold);font-size:11px;letter-spacing:.3em;margin-left:8px;vertical-align:2px}
 .hbtn{
-  border:none;border-radius:12px;padding:8px 12px;font-size:14px;font-weight:700;
-  cursor:pointer;color:#fff;box-shadow:var(--shadow);white-space:nowrap;
-  transition:transform .1s;font-family:inherit;
+  display:inline-flex;align-items:center;gap:7px;
+  border:1px solid var(--line);border-radius:8px;padding:8px 13px;
+  font-size:13px;font-weight:600;letter-spacing:.05em;
+  cursor:pointer;color:var(--txt2);background:transparent;white-space:nowrap;
+  transition:color .15s,border-color .15s,background .15s;font-family:inherit;
 }
-.hbtn:active{transform:scale(.93)}
-.hbtn:disabled{opacity:.35;cursor:default}
-#btnUndo,#btnRedo{background:#5b8def}
-#btnClear{background:#ff7043}
-#btnSave{background:#26a69a}
-#btnGallery{background:#ab47bc}
-#btnColoring{background:#ff6ea9}
-#btnStamps{background:#ffb400}
+.hbtn svg{width:16px;height:16px}
+.hbtn:hover{color:var(--txt);border-color:var(--line2);background:var(--bg2)}
+.hbtn:active{background:var(--bg3)}
+.hbtn:disabled{opacity:.3;cursor:default}
+.hbtn.primary{color:var(--gold);border-color:rgba(200,164,104,.4)}
+.hbtn.primary:hover{background:var(--gold-soft);border-color:var(--gold)}
 .spacer{flex:1}
 /* ── 主區 ── */
 main{flex:1;display:flex;min-height:0}
 /* 左側工具列 */
 #toolbar{
-  width:78px;display:flex;flex-direction:column;gap:6px;align-items:center;
-  padding:10px 6px;overflow-y:auto;z-index:10;
+  width:72px;display:flex;flex-direction:column;gap:2px;align-items:center;
+  padding:10px 8px;overflow-y:auto;z-index:10;
+  background:var(--bg1);border-right:1px solid var(--line);
 }
 .tool{
-  width:64px;border:3px solid transparent;border-radius:var(--radius);
-  background:var(--panel);box-shadow:var(--shadow);cursor:pointer;
-  display:flex;flex-direction:column;align-items:center;padding:6px 2px 4px;
-  transition:transform .1s;font-family:inherit;
+  width:56px;border:1px solid transparent;border-radius:var(--radius);
+  background:transparent;cursor:pointer;color:var(--txt2);
+  display:flex;flex-direction:column;align-items:center;gap:3px;padding:8px 2px 6px;
+  transition:color .15s,background .15s,border-color .15s;font-family:inherit;
 }
-.tool .ico{font-size:24px;line-height:1.15}
-.tool .lbl{font-size:11px;font-weight:700;color:#555}
-.tool:active{transform:scale(.92)}
-.tool.active{border-color:var(--accent);background:#f1e8ff}
-.tool.toggled{border-color:#26a69a;background:#e0f7f4}
+.tool .ico{display:flex}
+.tool .ico svg{width:21px;height:21px}
+.tool .lbl{font-size:10px;letter-spacing:.08em;font-weight:600}
+.tool:hover{color:var(--txt);background:var(--bg2)}
+.tool.active{color:var(--gold);background:var(--gold-soft);border-color:rgba(200,164,104,.35)}
+.tool.toggled{color:var(--gold);border-color:rgba(200,164,104,.35)}
 /* 畫布 */
-#stage{flex:1;display:flex;align-items:center;justify-content:center;min-width:0;padding:6px;overflow:auto}
+#stage{flex:1;display:flex;align-items:center;justify-content:center;min-width:0;padding:14px;overflow:auto;
+  background:radial-gradient(ellipse at 50% 40%,#1a1a20 0%,var(--bg0) 75%)}
 #stage.zoomed{align-items:flex-start;justify-content:flex-start}
-#canvasWrap{position:relative;box-shadow:0 8px 30px rgba(60,30,120,.25);border-radius:10px;overflow:hidden}
+#canvasWrap{position:relative;box-shadow:0 20px 60px rgba(0,0,0,.6),0 0 0 1px var(--line2);border-radius:4px;overflow:hidden}
 #board{display:block;background:#ffffff;touch-action:none;cursor:crosshair}
 /* ── 底部調色盤 ── */
 #bottombar{
-  display:flex;align-items:center;gap:10px;padding:8px 12px;flex-wrap:wrap;
-  background:rgba(255,255,255,.75);backdrop-filter:blur(6px);
-  box-shadow:0 -2px 8px rgba(0,0,0,.06);z-index:20;
+  display:flex;align-items:center;gap:14px;padding:10px 16px;flex-wrap:wrap;
+  background:var(--bg1);border-top:1px solid var(--line);z-index:20;
 }
-#palette{display:flex;gap:5px;flex-wrap:wrap;max-width:640px}
+#palette{display:flex;gap:6px;flex-wrap:wrap;max-width:640px}
 .swatch{
-  width:28px;height:28px;border-radius:50%;cursor:pointer;
-  border:3px solid rgba(0,0,0,.12);transition:transform .1s;
+  width:24px;height:24px;border-radius:50%;cursor:pointer;
+  border:1px solid rgba(255,255,255,.14);transition:transform .12s,box-shadow .12s;
 }
-.swatch.active{border-color:#333;transform:scale(1.2)}
-#customColor{width:34px;height:34px;border:none;border-radius:50%;cursor:pointer;padding:0;background:none}
-.sizebox{display:flex;align-items:center;gap:6px}
-.sizebox label{font-size:13px;font-weight:700;color:#666;white-space:nowrap}
-#sizeSlider{width:130px;accent-color:var(--accent)}
+.swatch:hover{transform:scale(1.15)}
+.swatch.active{transform:scale(1.2);box-shadow:0 0 0 2px var(--bg1),0 0 0 3.5px var(--gold)}
+#customColor{width:30px;height:30px;border:1px solid var(--line2);border-radius:50%;cursor:pointer;padding:0;background:none}
+.sizebox{display:flex;align-items:center;gap:8px}
+.sizebox label{font-size:12px;font-weight:600;letter-spacing:.1em;color:var(--txt2);white-space:nowrap}
+input[type=range]{appearance:none;-webkit-appearance:none;height:3px;border-radius:2px;background:var(--line2);cursor:pointer}
+input[type=range]::-webkit-slider-thumb{appearance:none;-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:var(--gold);border:none}
+#sizeSlider{width:130px}
 #sizeDot{width:44px;height:44px;display:flex;align-items:center;justify-content:center}
-#sizeDot i{display:block;border-radius:50%;background:#333}
-#paperBox{display:flex;gap:4px;align-items:center}
-#paperBox span{font-size:12px;font-weight:700;color:#666}
-.paper{width:22px;height:22px;border-radius:6px;border:2px solid rgba(0,0,0,.2);cursor:pointer}
-.paper.active{border-color:#7c4dff;box-shadow:0 0 0 2px #c9b3ff}
+#sizeDot i{display:block;border-radius:50%;background:#e9e7e2;box-shadow:0 0 0 1px var(--line2)}
+#paperBox{display:flex;gap:5px;align-items:center}
+#paperBox span{font-size:12px;font-weight:600;letter-spacing:.1em;color:var(--txt2)}
+.paper{width:20px;height:20px;border-radius:5px;border:1px solid var(--line2);cursor:pointer;transition:box-shadow .12s}
+.paper.active{box-shadow:0 0 0 2px var(--bg1),0 0 0 3.5px var(--gold)}
 /* ── 抽屜面板 ── */
 .drawer{
-  position:fixed;inset:0;background:rgba(40,20,80,.45);z-index:50;
+  position:fixed;inset:0;background:rgba(6,6,9,.72);backdrop-filter:blur(3px);z-index:50;
   display:none;align-items:center;justify-content:center;
 }
 .drawer.open{display:flex}
 .drawer .panel{
-  background:#fff;border-radius:20px;box-shadow:0 20px 60px rgba(0,0,0,.3);
-  width:min(720px,94vw);max-height:86vh;display:flex;flex-direction:column;overflow:hidden;
+  background:var(--bg1);border:1px solid var(--line2);border-radius:14px;box-shadow:var(--shadow);
+  width:min(760px,94vw);max-height:88vh;display:flex;flex-direction:column;overflow:hidden;
 }
 .panel .phead{
-  display:flex;align-items:center;padding:12px 16px;gap:10px;
-  background:linear-gradient(90deg,#f3ebff,#ffe9f2);
+  display:flex;align-items:center;padding:16px 20px 12px;gap:12px;
+  border-bottom:1px solid var(--line);
 }
-.panel .phead h2{font-size:18px;color:#5a3ea6;flex:1}
-.closeBtn{border:none;background:#fff;border-radius:50%;width:44px;height:44px;font-size:18px;cursor:pointer;box-shadow:var(--shadow);font-weight:700;color:#666;flex-shrink:0}
-.panel .pbody{overflow-y:auto;padding:12px 16px}
+.panel .phead h2{font-family:var(--serif);font-size:17px;font-weight:600;letter-spacing:.08em;color:var(--txt);flex:1}
+.closeBtn{border:1px solid var(--line);background:transparent;border-radius:50%;width:44px;height:44px;font-size:16px;cursor:pointer;color:var(--txt2);flex-shrink:0;transition:color .15s,border-color .15s}
+.closeBtn:hover{color:var(--txt);border-color:var(--line2)}
+.panel .pbody{overflow-y:auto;padding:16px 20px}
+/* 分類頁籤 */
+#stampTabs,#colorTabs{display:flex;gap:8px;padding:12px 20px;flex-wrap:wrap;border-bottom:1px solid var(--line)}
+.stab{border:1px solid var(--line);border-radius:999px;padding:8px 16px;min-height:40px;font-size:13px;font-weight:600;letter-spacing:.04em;cursor:pointer;background:transparent;color:var(--txt2);font-family:inherit;transition:all .15s}
+.stab:hover{color:var(--txt);border-color:var(--line2)}
+.stab.active{background:var(--gold-soft);color:var(--gold);border-color:rgba(200,164,104,.45)}
 /* 印章 */
-#stampTabs,#colorTabs{display:flex;gap:8px;padding:0 16px 8px;flex-wrap:wrap;background:linear-gradient(90deg,#f3ebff,#ffe9f2)}
-.stab{border:none;border-radius:999px;padding:8px 16px;min-height:40px;font-size:14px;font-weight:700;cursor:pointer;background:#fff;color:#666;font-family:inherit}
-.stab.active{background:var(--accent);color:#fff}
-#stampGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(52px,1fr));gap:4px}
-.stampBtn{border:none;background:#faf7ff;border-radius:10px;font-size:30px;padding:6px 0;cursor:pointer;line-height:1.2}
-.stampBtn:hover{background:#efe6ff}
-.stampBtn.active{background:#e2d4ff;outline:3px solid var(--accent)}
+#stampGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(54px,1fr));gap:6px}
+.stampBtn{border:1px solid transparent;background:var(--bg2);border-radius:10px;font-size:29px;padding:7px 0;cursor:pointer;line-height:1.2;transition:background .12s,border-color .12s}
+.stampBtn:hover{background:var(--bg3)}
+.stampBtn.active{border-color:var(--gold);background:var(--gold-soft)}
 /* 著色本 */
-#pageGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
-#photoPanel{display:none;flex-direction:column;gap:10px;margin-bottom:12px}
+#pageGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:14px}
+#photoPanel{display:none;flex-direction:column;gap:12px;margin-bottom:14px}
 #photoPanel.show{display:flex}
-#photoPanel .photoHint{font-size:13px;color:#777;line-height:1.7;background:#faf7ff;border-radius:10px;padding:10px 12px}
-.photoRow{display:flex;gap:14px;align-items:center;flex-wrap:wrap}
-.photoRow label{font-size:13px;font-weight:700;color:#555;display:flex;align-items:center;gap:6px}
-.photoRow input[type=range]{width:120px;accent-color:var(--accent)}
-#photoPreview{width:100%;max-width:600px;border:2px solid #eee;border-radius:10px;align-self:center}
-.pageCard{border:3px solid #eee;border-radius:14px;overflow:hidden;cursor:pointer;background:#fff;text-align:center;transition:transform .1s;font-family:inherit;padding:0}
-.pageCard:hover{transform:scale(1.03);border-color:var(--accent2)}
+#photoPanel .photoHint{font-size:13px;color:var(--txt2);line-height:1.8;background:var(--bg2);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+#photoPanel .photoHint b{color:var(--gold);font-weight:600}
+.photoRow{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+.photoRow label{font-size:12px;font-weight:600;letter-spacing:.08em;color:var(--txt2);display:flex;align-items:center;gap:8px}
+.photoRow input[type=range]{width:120px}
+#photoPreview{width:100%;max-width:600px;border:1px solid var(--line2);border-radius:8px;align-self:center;background:#fff}
+.pageCard{border:1px solid var(--line);border-radius:10px;overflow:hidden;cursor:pointer;background:var(--bg2);text-align:center;transition:border-color .15s,transform .15s;font-family:inherit;padding:0}
+.pageCard:hover{transform:translateY(-2px);border-color:var(--gold)}
 .pageCard canvas{width:100%;display:block;background:#fff}
-.pageCard .pname{font-size:14px;font-weight:700;color:#555;padding:6px}
-.pageCard .emThumb{width:100%;aspect-ratio:3/2;display:flex;align-items:center;justify-content:center;font-size:56px;background:#fff;filter:grayscale(1) opacity(.3)}
+.pageCard .pname{font-size:13px;font-weight:600;letter-spacing:.06em;color:var(--txt2);padding:8px 6px}
+.pageCard .emThumb{width:100%;aspect-ratio:3/2;display:flex;align-items:center;justify-content:center;font-size:56px;background:#fff;filter:grayscale(1) opacity(.25)}
 /* 作品集 */
-#galleryGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px}
-.workCard{border:3px solid #eee;border-radius:14px;overflow:hidden;background:#fff;position:relative}
+#galleryGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:14px}
+.workCard{border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--bg2);position:relative;transition:border-color .15s}
+.workCard:hover{border-color:var(--line2)}
 .workCard img{width:100%;display:block;cursor:pointer}
-.workCard .del{position:absolute;top:6px;right:6px;border:none;background:#ff5252;color:#fff;border-radius:50%;width:26px;height:26px;cursor:pointer;font-weight:700}
-#galleryEmpty{color:#999;font-size:15px;text-align:center;padding:30px 0}
-/* 提示泡泡 */
+.workCard .del{position:absolute;top:8px;right:8px;border:none;background:rgba(16,16,19,.8);color:var(--txt2);border-radius:50%;width:28px;height:28px;cursor:pointer;font-weight:700;transition:color .15s,background .15s}
+.workCard .del:hover{background:var(--danger);color:#fff}
+#galleryEmpty{color:var(--txt2);font-size:14px;text-align:center;padding:36px 0;letter-spacing:.05em}
+/* 提示 */
 #toast{
-  position:fixed;left:50%;bottom:90px;transform:translateX(-50%) translateY(20px);
-  background:#333;color:#fff;padding:10px 20px;border-radius:999px;font-size:14px;
+  position:fixed;left:50%;bottom:92px;transform:translateX(-50%) translateY(16px);
+  background:var(--bg2);color:var(--txt);border:1px solid rgba(200,164,104,.4);
+  padding:11px 22px;border-radius:8px;font-size:13px;letter-spacing:.04em;
   opacity:0;pointer-events:none;transition:all .25s;z-index:99;white-space:nowrap;
+  box-shadow:var(--shadow);
 }
-#toast.show{opacity:.92;transform:translateX(-50%) translateY(0)}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 @media (max-width:640px){
-  header h1{font-size:16px}
-  .hbtn{padding:7px 9px;font-size:12px}
-  #toolbar{width:66px}
-  .tool{width:56px}
-  .tool .ico{font-size:20px}
+  header{padding:8px 10px}
+  header h1{font-size:15px;margin-right:6px}
+  header h1 em{display:none}
+  .hbtn{padding:7px 10px;font-size:12px}
+  .hbtn .btxt{display:none}
+  #toolbar{width:60px}
+  .tool{width:50px}
+  .tool .ico svg{width:19px;height:19px}
 }
 </style>
 </head>
 <body>
 
 <header>
-  <h1>🎨 自由畫板</h1>
-  <button class="hbtn" id="btnStamps">🧸 卡通印章</button>
-  <button class="hbtn" id="btnColoring">🖍️ 著色本</button>
-  <button class="hbtn" id="btnGallery">🖼️ 作品集</button>
+  <h1>自由畫板<em>ATELIER</em></h1>
+  <button class="hbtn primary" id="btnStamps"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="4"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.5"/><path d="M8 14.5l2.8 6H5.2l2.8-6z"/></svg><span class="btxt">圖章</span></button>
+  <button class="hbtn primary" id="btnColoring"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6c-2-1.4-4.6-2-8-2v14c3.4 0 6 .6 8 2 2-1.4 4.6-2 8-2V4c-3.4 0-6 .6-8 2z"/><path d="M12 6v14"/></svg><span class="btxt">著色本</span></button>
+  <button class="hbtn primary" id="btnGallery"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M4 17l5-5 4 4 3-3 4 4"/></svg><span class="btxt">作品集</span></button>
   <span class="spacer"></span>
-  <button class="hbtn" id="btnUndo">↩️ 復原</button>
-  <button class="hbtn" id="btnRedo">↪️ 重做</button>
-  <button class="hbtn" id="btnClear">🗑️ 清除</button>
-  <button class="hbtn" id="btnSave">💾 存檔</button>
+  <button class="hbtn" id="btnUndo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 6 6v4"/></svg><span class="btxt">復原</span></button>
+  <button class="hbtn" id="btnRedo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 14l5-5-5-5"/><path d="M20 9H10a6 6 0 0 0-6 6v4"/></svg><span class="btxt">重做</span></button>
+  <button class="hbtn" id="btnClear"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M9 7V4h6v3"/><path d="M6 7l1 13h10l1-13"/><path d="M10 11v5M14 11v5"/></svg><span class="btxt">清除</span></button>
+  <button class="hbtn" id="btnSave"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v11"/><path d="M7 10l5 5 5-5"/><path d="M4 19h16"/></svg><span class="btxt">存檔</span></button>
 </header>
 
 <main>
@@ -186,7 +215,7 @@ main{flex:1;display:flex;min-height:0}
 <!-- 印章抽屜 -->
 <div class="drawer" id="stampDrawer">
   <div class="panel">
-    <div class="phead"><h2>🧸 卡通印章 — 點選圖案，再點畫布蓋章！</h2><button class="closeBtn" data-close="stampDrawer">✕</button></div>
+    <div class="phead"><h2>圖章庫 — 點選圖案後，在畫布上按一下蓋章</h2><button class="closeBtn" data-close="stampDrawer">✕</button></div>
     <div id="stampTabs"></div>
     <div class="pbody"><div id="stampGrid"></div></div>
   </div>
@@ -195,19 +224,19 @@ main{flex:1;display:flex;min-height:0}
 <!-- 著色本抽屜 -->
 <div class="drawer" id="coloringDrawer">
   <div class="panel">
-    <div class="phead"><h2 id="coloringTitle">🖍️ 著色本 — 選一張圖，用油漆桶填上顏色！</h2><button class="closeBtn" data-close="coloringDrawer">✕</button></div>
+    <div class="phead"><h2 id="coloringTitle">著色本 — 選擇線稿，以油漆桶上色</h2><button class="closeBtn" data-close="coloringDrawer">✕</button></div>
     <div id="colorTabs"></div>
     <div class="pbody">
       <div id="photoPanel">
-        <div class="photoHint">📷 把照片變成黑白線稿著色圖！選一張照片、調整線條細節，按「放到畫布」就能開始著色。照片只在你的電腦上處理，<b>不會上傳到網路</b>。</div>
+        <div class="photoHint">將照片轉為黑白線稿著色圖。選擇照片、調整線條細節，按「放到畫布」即可開始上色。照片僅在本機處理，<b>不會上傳至網路</b>。</div>
         <input type="file" id="photoInput" accept="image/*" hidden>
-        <div class="photoRow"><button class="hbtn" id="photoPick" style="background:#5b8def">📷 選擇照片</button></div>
+        <div class="photoRow"><button class="hbtn primary" id="photoPick">選擇照片</button></div>
         <div id="photoEditor" style="display:none">
           <canvas id="photoPreview" width="600" height="400"></canvas>
           <div class="photoRow" style="margin-top:10px">
             <label>線條細節 <input type="range" id="photoDetail" min="20" max="130" value="75"></label>
             <label>線條粗細 <input type="range" id="photoThick" min="0" max="3" value="1"></label>
-            <button class="hbtn" id="photoApply" style="background:#26a69a">✅ 放到畫布著色！</button>
+            <button class="hbtn primary" id="photoApply">放到畫布</button>
           </div>
         </div>
       </div>
@@ -219,8 +248,8 @@ main{flex:1;display:flex;min-height:0}
 <!-- 作品集抽屜 -->
 <div class="drawer" id="galleryDrawer">
   <div class="panel">
-    <div class="phead"><h2>🖼️ 我的作品集</h2><button class="hbtn" id="btnSaveToGallery" style="background:#26a69a">＋ 收藏目前畫作</button><button class="closeBtn" data-close="galleryDrawer">✕</button></div>
-    <div class="pbody"><div id="galleryGrid"></div><div id="galleryEmpty" style="display:none">還沒有收藏的作品，畫一張再按「收藏目前畫作」吧！</div></div>
+    <div class="phead"><h2>作品集</h2><button class="hbtn primary" id="btnSaveToGallery">＋ 收藏目前畫作</button><button class="closeBtn" data-close="galleryDrawer">✕</button></div>
+    <div class="pbody"><div id="galleryGrid"></div><div id="galleryEmpty" style="display:none">尚無收藏的作品 — 完成畫作後按「收藏目前畫作」。</div></div>
   </div>
 </div>
 
@@ -244,35 +273,51 @@ const state = {
 };
 
 /* ══════════════ 工具列 ══════════════ */
+const svgIcon = p => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
+const ICONS = {
+  pen:     svgIcon('<path d="M4 20l1.2-4.2L16 5l3 3L8.2 18.8 4 20z"/><path d="M13.5 7.5l3 3"/>'),
+  marker:  svgIcon('<path d="M9 3h6v7l2 3v8H7v-8l2-3V3z"/><path d="M9 10h6"/>'),
+  crayon:  svgIcon('<path d="M8 21V9.5L12 3l4 6.5V21H8z"/><path d="M8 13h8"/>'),
+  spray:   svgIcon('<rect x="7" y="9" width="9" height="12" rx="1.5"/><path d="M9.5 9V6h4v3"/><path d="M18.5 4h.01M21 7h.01M18.5 10h.01M21 12.5h.01"/>'),
+  rainbow: svgIcon('<path d="M4 17a8 8 0 0 1 16 0"/><path d="M8.5 17a3.5 3.5 0 0 1 7 0"/>'),
+  glitter: svgIcon('<path d="M11 4l1.6 4.4L17 10l-4.4 1.6L11 16l-1.6-4.4L5 10l4.4-1.6L11 4z"/><path d="M18 15l.8 2.2L21 18l-2.2.8L18 21l-.8-2.2L15 18l2.2-.8L18 15z"/>'),
+  glow:    svgIcon('<circle cx="12" cy="12" r="4"/><path d="M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21M5.9 5.9l1.8 1.8M16.3 16.3l1.8 1.8M18.1 5.9l-1.8 1.8M7.7 16.3l-1.8 1.8"/>'),
+  bucket:  svgIcon('<path d="M5 12l7-7 7 7-7 7-7-7z"/><path d="M5 12h14"/><path d="M20 17.2c0 1.3-.8 2.3-1.8 2.3s-1.8-1-1.8-2.3 1.8-3.2 1.8-3.2 1.8 1.9 1.8 3.2z"/>'),
+  stamp:   svgIcon('<path d="M9 4h6v4.5a3 3 0 0 1-1 2.5h4a2 2 0 0 1 2 2v3H4v-3a2 2 0 0 1 2-2h4a3 3 0 0 1-1-2.5V4z"/><path d="M5 20h14"/>'),
+  eraser:  svgIcon('<path d="M14.5 4.5l5 5L10 19H6.5l-3-3 11-11z"/><path d="M8.5 10.5l5 5"/><path d="M13 20h8"/>'),
+  hand:    svgIcon('<path d="M12 3v18M3 12h18"/><path d="M12 3l-2.2 2.2M12 3l2.2 2.2M12 21l-2.2-2.2M12 21l2.2-2.2M3 12l2.2-2.2M3 12l2.2 2.2M21 12l-2.2-2.2M21 12l-2.2 2.2"/>'),
+  mirror:  svgIcon('<path d="M12 3v18" stroke-dasharray="2.5 3"/><path d="M8 8l-4 4 4 4M16 8l4 4-4 4"/>'),
+  zoom:    svgIcon('<circle cx="11" cy="11" r="6"/><path d="M15.5 15.5L21 21"/><path d="M11 8.5v5M8.5 11h5"/>'),
+};
 const TOOLS = [
-  { id:"pen",     ico:"✏️", lbl:"鉛筆" },
-  { id:"marker",  ico:"🖊️", lbl:"麥克筆" },
-  { id:"crayon",  ico:"🖍️", lbl:"蠟筆" },
-  { id:"spray",   ico:"💨", lbl:"噴槍" },
-  { id:"rainbow", ico:"🌈", lbl:"彩虹筆" },
-  { id:"glitter", ico:"✨", lbl:"亮粉筆" },
-  { id:"glow",    ico:"💡", lbl:"螢光筆" },
-  { id:"bucket",  ico:"🪣", lbl:"油漆桶" },
-  { id:"stamp",   ico:"🧸", lbl:"印章" },
-  { id:"eraser",  ico:"🧽", lbl:"橡皮擦" },
-  { id:"hand",    ico:"✋", lbl:"移動" },
+  { id:"pen",     lbl:"鉛筆" },
+  { id:"marker",  lbl:"麥克筆" },
+  { id:"crayon",  lbl:"蠟筆" },
+  { id:"spray",   lbl:"噴槍" },
+  { id:"rainbow", lbl:"彩虹筆" },
+  { id:"glitter", lbl:"亮粉筆" },
+  { id:"glow",    lbl:"螢光筆" },
+  { id:"bucket",  lbl:"油漆桶" },
+  { id:"stamp",   lbl:"圖章" },
+  { id:"eraser",  lbl:"橡皮擦" },
+  { id:"hand",    lbl:"移動" },
 ];
 const toolbar = document.getElementById("toolbar");
 TOOLS.forEach(t => {
   const b = document.createElement("button");
   b.className = "tool"; b.dataset.tool = t.id;
-  b.innerHTML = `<span class="ico">${t.ico}</span><span class="lbl">${t.lbl}</span>`;
+  b.innerHTML = `<span class="ico">${ICONS[t.id]}</span><span class="lbl">${t.lbl}</span>`;
   b.addEventListener("click", () => setTool(t.id));
   toolbar.appendChild(b);
 });
 // 對稱開關（獨立切換鈕）
 const mirrorBtn = document.createElement("button");
 mirrorBtn.className = "tool"; mirrorBtn.id = "mirrorBtn";
-mirrorBtn.innerHTML = `<span class="ico">🦋</span><span class="lbl">對稱畫</span>`;
+mirrorBtn.innerHTML = `<span class="ico">${ICONS.mirror}</span><span class="lbl">對稱</span>`;
 mirrorBtn.addEventListener("click", () => {
   state.mirror = !state.mirror;
   mirrorBtn.classList.toggle("toggled", state.mirror);
-  toast(state.mirror ? "對稱模式：開 🦋" : "對稱模式：關");
+  toast(state.mirror ? "對稱模式：開" : "對稱模式：關");
 });
 toolbar.appendChild(mirrorBtn);
 // 放大鏡：小區域好點（搭配「✋移動」拖動畫布）
@@ -280,7 +325,7 @@ let zoomFactor = 1;
 const ZOOMS = [1, 1.6, 2.4];
 const zoomBtn = document.createElement("button");
 zoomBtn.className = "tool"; zoomBtn.id = "zoomBtn";
-zoomBtn.innerHTML = `<span class="ico">🔍</span><span class="lbl">放大</span>`;
+zoomBtn.innerHTML = `<span class="ico">${ICONS.zoom}</span><span class="lbl">放大</span>`;
 zoomBtn.addEventListener("click", () => {
   zoomFactor = ZOOMS[(ZOOMS.indexOf(zoomFactor) + 1) % ZOOMS.length];
   const stage = document.getElementById("stage");
@@ -289,7 +334,7 @@ zoomBtn.addEventListener("click", () => {
   zoomBtn.querySelector(".lbl").textContent = zoomFactor > 1 ? `×${zoomFactor}` : "放大";
   if (zoomFactor === 1) { stage.scrollLeft = 0; stage.scrollTop = 0; }
   fitCanvas();
-  toast(zoomFactor > 1 ? `放大 ${zoomFactor} 倍！用「✋移動」拖動畫布` : "回到原始大小");
+  toast(zoomFactor > 1 ? `放大 ${zoomFactor} 倍 — 以「移動」工具平移畫布` : "回到原始大小");
 });
 toolbar.appendChild(zoomBtn);
 
@@ -391,7 +436,7 @@ document.getElementById("btnRedo").addEventListener("click", doRedo);
 document.getElementById("btnClear").addEventListener("click", () => {
   pushUndo();
   ctx.clearRect(0,0,W,H);
-  toast("已清除畫布（可按「復原」找回）");
+  toast("畫布已清除（按復原可還原）");
 });
 
 /* ══════════════ 筆刷實作 ══════════════ */
@@ -558,12 +603,14 @@ const STAMP_SETS = {
   "🌸 自然": ["🌸","🌼","🌻","🌹","🌷","🌺","🌲","🌳","🌴","🌵","🍀","🍁","🍂","🌈","☀️","🌤️","☁️","🌧️","⛈️","❄️","⛄","🌙","⭐","🌟","💫","🌊","🔥","💧","🌍","🪐"],
   "🎉 好玩": ["⚽","🏀","🏈","⚾","🎾","🏐","🎱","🎳","🎯","🎮","🎲","🧩","🧸","🪁","🎁","🎀","🎊","🎉","🎵","🎶","🎤","🎸","🥁","🎺","👑","💎","💖","💝","💯","⚡","🏆","🥇","🎨","🖌️","📚","✏️"],
 };
+// 分類鍵含 emoji（當資料鍵用），顯示時去掉前綴較有質感
+const tabLabel = s => s.replace(/^[^一-鿿A-Za-z]+\s*/, "");
 const stampTabs = document.getElementById("stampTabs");
 const stampGrid = document.getElementById("stampGrid");
 let currentSet = Object.keys(STAMP_SETS)[0];
 Object.keys(STAMP_SETS).forEach(name => {
   const b = document.createElement("button");
-  b.className = "stab"; b.textContent = name; b.dataset.set = name;
+  b.className = "stab"; b.textContent = tabLabel(name); b.dataset.set = name;
   b.addEventListener("click", () => { currentSet = name; renderStamps(); });
   stampTabs.appendChild(b);
 });
@@ -579,7 +626,7 @@ function renderStamps() {
       state.stamp = em;
       setTool("stamp");
       closeDrawer("stampDrawer");
-      toast(`已選 ${em}，點畫布蓋章！`);
+      toast(`已選 ${em} — 在畫布上按一下蓋章`);
     });
     stampGrid.appendChild(b);
   });
@@ -845,7 +892,7 @@ const EMOJI_PAGE_SETS = {
   }
 })();
 const TOTAL_PAGES = PAGES.length + Object.values(EMOJI_PAGE_SETS).reduce((a, s) => a + s.length, 0);
-document.getElementById("coloringTitle").textContent = `🖍️ 著色本（共 ${TOTAL_PAGES} 張）— 選一張，用油漆桶上色！`;
+document.getElementById("coloringTitle").textContent = `著色本 · 共 ${TOTAL_PAGES} 張 — 選擇線稿，以油漆桶上色`;
 
 /* ── 著色本分頁 ── */
 const CLASSIC_TAB = "🏞️ 經典場景", PHOTO_TAB = "📷 照片變線稿";
@@ -857,7 +904,7 @@ const thumbCache = new Map();
 const colorTabsEl = document.getElementById("colorTabs");
 COLOR_TABS.forEach(name => {
   const b = document.createElement("button");
-  b.className = "stab"; b.textContent = name; b.dataset.tab = name;
+  b.className = "stab"; b.textContent = tabLabel(name); b.dataset.tab = name;
   b.addEventListener("click", () => { currentColorTab = name; renderColoringTab(); });
   colorTabsEl.appendChild(b);
 });
@@ -941,7 +988,7 @@ function loadColoringPage(i) {
   ctx.restore();
   closeDrawer("coloringDrawer");
   setTool("bucket");
-  toast(`「${PAGES[i].name}」載入完成，用油漆桶上色！（按復原可找回原畫）`);
+  toast(`已載入「${PAGES[i].name}」— 以油漆桶上色（按復原可還原）`);
 }
 function loadEmojiPage(em) {
   pushUndo();
@@ -949,7 +996,7 @@ function loadEmojiPage(em) {
   ctx.drawImage(emojiColoringPage(em, W, H, 2), 0, 0);
   closeDrawer("coloringDrawer");
   setTool("bucket");
-  toast(`${em} 線稿載入完成，用油漆桶上色！（按復原可找回原畫）`);
+  toast(`線稿已載入 — 以油漆桶上色（按復原可還原）`);
 }
 
 /* ── 照片變線稿 ── */
@@ -1016,7 +1063,7 @@ document.getElementById("photoApply").addEventListener("click", () => {
   ctx.restore();
   closeDrawer("coloringDrawer");
   setTool("bucket");
-  toast("照片線稿完成，用油漆桶上色吧！（按復原可找回原畫）");
+  toast("照片線稿已載入（按復原可還原）");
 });
 
 /* ══════════════ 畫布事件 ══════════════ */
@@ -1035,7 +1082,7 @@ canvas.addEventListener("pointerdown", e => {
     const ok = floodFill(x, y, state.color);
     if (state.mirror && ok) floodFill(W - x, y, state.color);
     if (ok) pushUndo(before);
-    else toast("這裡已經是這個顏色囉，換個顏色或換個地方點點看！");
+    else toast("此處已是這個顏色 — 請換一個顏色或區域");
     return;
   }
   if (state.tool === "stamp") {
@@ -1085,7 +1132,7 @@ document.getElementById("btnSave").addEventListener("click", () => {
   a.download = `我的畫作-${d.getFullYear()}${String(d.getMonth()+1).padStart(2,"0")}${String(d.getDate()).padStart(2,"0")}-${String(d.getHours()).padStart(2,"0")}${String(d.getMinutes()).padStart(2,"0")}.png`;
   a.href = compositeCanvas();
   a.click();
-  toast("已下載畫作 💾");
+  toast("畫作已下載");
 });
 
 /* ══════════════ 作品集（localStorage） ══════════════ */
@@ -1118,7 +1165,7 @@ function renderGallery() {
       im.onload = () => { ctx.clearRect(0,0,W,H); ctx.drawImage(im,0,0,W,H); };
       im.src = item.img;
       closeDrawer("galleryDrawer");
-      toast("作品已載入，可以繼續畫！（按復原可找回原畫）");
+      toast("作品已載入（按復原可還原）");
     });
     const del = document.createElement("button");
     del.className = "del"; del.textContent = "✕"; del.title = "刪除這張作品";
@@ -1133,7 +1180,7 @@ function renderGallery() {
 document.getElementById("btnSaveToGallery").addEventListener("click", () => {
   const list = loadGallery();
   list.push({ id: Date.now(), img: compositeCanvas("image/jpeg", 0.72) });
-  if (saveGallery(list)) toast("已收藏到作品集 🖼️");
+  if (saveGallery(list)) toast("已收藏至作品集");
   renderGallery();
 });
 
