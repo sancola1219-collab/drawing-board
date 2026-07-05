@@ -228,14 +228,16 @@ input[type=range]::-webkit-slider-thumb{appearance:none;-webkit-appearance:none;
     <div id="colorTabs"></div>
     <div class="pbody">
       <div id="photoPanel">
-        <div class="photoHint">將照片轉為黑白線稿著色圖。選擇照片、調整線條細節，按「放到畫布」即可開始上色。照片僅在本機處理，<b>不會上傳至網路</b>。</div>
+        <div class="photoHint">將照片自動轉為可著色的線稿：系統會把照片簡化為封閉色塊並描出輪廓，每一塊都能用油漆桶上色，無需手動調整。照片僅在本機處理，<b>不會上傳至網路</b>。</div>
         <input type="file" id="photoInput" accept="image/*" hidden>
         <div class="photoRow"><button class="hbtn primary" id="photoPick">選擇照片</button></div>
         <div id="photoEditor" style="display:none">
           <canvas id="photoPreview" width="600" height="400"></canvas>
           <div class="photoRow" style="margin-top:10px">
-            <label>線條細節 <input type="range" id="photoDetail" min="20" max="130" value="75"></label>
-            <label>線條粗細 <input type="range" id="photoThick" min="0" max="3" value="1"></label>
+            <label>風格</label>
+            <button class="stab preset" data-preset="simple">簡約</button>
+            <button class="stab preset active" data-preset="standard">標準</button>
+            <button class="stab preset" data-preset="fine">精細</button>
             <button class="hbtn primary" id="photoApply">放到畫布</button>
           </div>
         </div>
@@ -536,13 +538,18 @@ function floodFill(sx, sy, fillColor) {
   if (isLine(idx(sx, sy))) {
     let fx = -1, fy = -1;
     outer:
-    for (let r = 1; r <= 8; r++) {
+    for (let r = 1; r <= 10; r++) {
       for (let dy = -r; dy <= r; dy++) {
         for (let dx = -r; dx <= r; dx++) {
           if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
           const nx = sx + dx, ny = sy + dy;
           if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue;
-          if (!isLine(idx(nx, ny))) { fx = nx; fy = ny; break outer; }
+          if (isLine(idx(nx, ny))) continue;
+          // 跳出線後沿同方向再深入 2px，越過線緣的反鋸齒漸層帶，才是真正的區域色
+          const dx2 = nx + Math.sign(dx) * 2, dy2 = ny + Math.sign(dy) * 2;
+          if (dx2 >= 0 && dy2 >= 0 && dx2 < W && dy2 < H && !isLine(idx(dx2, dy2))) { fx = dx2; fy = dy2; }
+          else { fx = nx; fy = ny; }
+          break outer;
         }
       }
     }
@@ -649,7 +656,27 @@ const P = { // 繪圖小工具（座標以 1200x800 為準）
   dot(c,x,y,r=10){ c.beginPath(); c.arc(x,y,r,0,7); c.save(); c.fillStyle="#222"; c.fill(); c.restore(); },
   arc(c,x,y,r,a0,a1){ c.beginPath(); c.arc(x,y,r,a0,a1); c.stroke(); },
   curve(c,pts){ c.beginPath(); c.moveTo(pts[0][0],pts[0][1]); for(let i=1;i<pts.length-1;i++){ const xc=(pts[i][0]+pts[i+1][0])/2, yc=(pts[i][1]+pts[i+1][1])/2; c.quadraticCurveTo(pts[i][0],pts[i][1],xc,yc);} c.stroke(); },
+  qcurve(c,x0,y0,cx,cy,x1,y1){ c.beginPath(); c.moveTo(x0,y0); c.quadraticCurveTo(cx,cy,x1,y1); c.stroke(); },
+  // 平滑「閉合」曲線：起終點保證相接，填色不會從缺口漏出
+  blob(c,pts){ const n=pts.length; c.beginPath(); c.moveTo((pts[0][0]+pts[n-1][0])/2,(pts[0][1]+pts[n-1][1])/2); for(let i=0;i<n;i++){ const p=pts[i],q=pts[(i+1)%n]; c.quadraticCurveTo(p[0],p[1],(p[0]+q[0])/2,(p[1]+q[1])/2);} c.closePath(); c.stroke(); },
 };
+/* 主題線稿共用元件 */
+function drawHeart(c,x,y,s){ c.beginPath(); c.moveTo(x,y+s); c.bezierCurveTo(x-s*1.5,y-s*0.2,x-s*0.6,y-s*1.1,x,y-s*0.4); c.bezierCurveTo(x+s*0.6,y-s*1.1,x+s*1.5,y-s*0.2,x,y+s); c.closePath(); c.stroke(); }
+function star5(c,x,y,r){ c.beginPath(); for(let i=0;i<10;i++){ const rr=i%2?r*0.45:r, a=-Math.PI/2+i*Math.PI/5; c.lineTo(x+Math.cos(a)*rr,y+Math.sin(a)*rr);} c.closePath(); c.stroke(); }
+function snowflake(c,x,y,s){ for(let i=0;i<3;i++){ const a=i*Math.PI/3; P.seg(c,x-Math.cos(a)*s,y-Math.sin(a)*s,x+Math.cos(a)*s,y+Math.sin(a)*s);} }
+function musicNote(c,x,y,s){ P.dot(c,x,y,s*0.32); P.seg(c,x+s*0.3,y,x+s*0.3,y-s*1.25); P.qcurve(c,x+s*0.3,y-s*1.25,x+s*0.85,y-s*1.15,x+s*0.9,y-s*0.7); }
+// 甜酷小惡魔：連帽兔耳頭（額前愛心＋垂垂長耳）
+function devilHead(c,x,y,s){
+  P.ellipse(c,x-s*0.78,y-s*1.18,s*0.34,s*0.92,-0.32);
+  P.ellipse(c,x+s*0.78,y-s*1.18,s*0.34,s*0.92,0.32);
+  P.ellipse(c,x-s*0.78,y-s*1.1,s*0.15,s*0.55,-0.32);
+  P.ellipse(c,x+s*0.78,y-s*1.1,s*0.15,s*0.55,0.32);
+  P.circle(c,x,y,s);
+  P.circle(c,x,y+s*0.1,s*0.66);
+  drawHeart(c,x,y-s*0.82,s*0.2);
+  P.dot(c,x-s*0.24,y+s*0.02,s*0.06); P.dot(c,x+s*0.24,y+s*0.02,s*0.06);
+  P.arc(c,x,y+s*0.26,s*0.13,0.3,Math.PI-0.3);
+}
 
 const PAGES = [
   { name:"貓咪", draw(c){ withOutline(c, c => {
@@ -771,6 +798,460 @@ const PAGES = [
   });}},
 ];
 
+/* ══ 甜酷小惡魔系列（原創致敬風格） ══ */
+const PAGES_DEVIL = [
+  { name:"微笑站姿", draw(c){ withOutline(c, c => {
+    devilHead(c,600,280,140);
+    P.ellipse(c,600,560,115,125); P.ellipse(c,600,570,62,72);       // 身體+肚皮
+    P.ellipse(c,478,505,38,60,0.5); P.ellipse(c,722,505,38,60,-0.5); // 手
+    P.ellipse(c,545,700,48,26); P.ellipse(c,655,700,48,26);          // 腳
+    P.curve(c,[[715,620],[820,660],[860,590]]);                      // 尾
+    P.poly(c,[[860,590],[905,572],[882,628]]);
+    drawHeart(c,250,250,40); drawHeart(c,955,350,30);
+  });}},
+  { name:"甜點時光", draw(c){ withOutline(c, c => {
+    devilHead(c,400,300,120);
+    P.ellipse(c,400,520,95,95); P.ellipse(c,320,478,32,50,0.5); P.ellipse(c,480,478,32,50,-0.5);
+    P.poly(c,[[700,480],[920,480],[890,660],[730,660]]);             // 杯子蛋糕杯身
+    P.seg(c,745,480,755,660); P.seg(c,810,480,810,660); P.seg(c,875,480,865,660);
+    P.curve(c,[[690,480],[700,400],[760,430],[810,370],[860,430],[920,400],[930,480]]); // 奶油
+    P.circle(c,810,340,24); P.qcurve(c,810,316,822,285,845,270);     // 櫻桃
+    drawHeart(c,620,225,28);
+  });}},
+  { name:"星星魔法", draw(c){ withOutline(c, c => {
+    devilHead(c,430,320,125);
+    P.ellipse(c,430,545,100,100); P.ellipse(c,330,505,32,52,0.5);
+    P.ellipse(c,540,468,34,55,-0.9);                                 // 舉杖手
+    P.seg(c,585,425,758,262);                                        // 魔杖
+    star5(c,800,215,72); star5(c,952,380,30); star5(c,660,128,26); star5(c,250,200,32);
+  });}},
+  { name:"晚安月亮", draw(c){ withOutline(c, c => {
+    c.beginPath(); c.arc(300,300,170,Math.PI*0.42,Math.PI*1.58);     // 月牙外弧
+    c.arc(380,300,120,Math.PI*1.5,Math.PI*0.5,true); c.closePath(); c.stroke();
+    devilHead(c,740,430,130);
+    P.ellipse(c,740,690,105,90);
+    star5(c,540,140,30); star5(c,1000,200,36); star5(c,1050,540,26); star5(c,180,600,28);
+  });}},
+  { name:"蝙蝠朋友", draw(c){ withOutline(c, c => {
+    devilHead(c,600,470,125);
+    P.ellipse(c,600,700,100,70);
+    const bat = (x,y,s) => {
+      P.circle(c,x,y,s*0.45);
+      P.poly(c,[[x-s*0.28,y-s*0.35],[x-s*0.15,y-s*0.7],[x-s*0.02,y-s*0.4]]);
+      P.poly(c,[[x+s*0.28,y-s*0.35],[x+s*0.15,y-s*0.7],[x+s*0.02,y-s*0.4]]);
+      P.blob(c,[[x-s*0.42,y-s*0.1],[x-s*0.85,y-s*0.4],[x-s*1.25,y-s*0.05],[x-s*0.8,y+s*0.12]]);
+      P.blob(c,[[x+s*0.42,y-s*0.1],[x+s*0.85,y-s*0.4],[x+s*1.25,y-s*0.05],[x+s*0.8,y+s*0.12]]);
+      P.dot(c,x-s*0.12,y-s*0.05,4); P.dot(c,x+s*0.12,y-s*0.05,4);
+    };
+    bat(270,220,130); bat(930,170,95);
+    P.circle(c,1060,120,52); star5(c,150,430,26);
+  });}},
+  { name:"午茶時光", draw(c){ withOutline(c, c => {
+    devilHead(c,380,300,115);
+    P.ellipse(c,380,505,90,90);
+    P.ellipse(c,760,520,130,100);                                    // 壺身
+    P.ellipse(c,760,415,45,16); P.arc(c,760,400,28,Math.PI,Math.PI*2); P.circle(c,760,368,12);
+    P.qcurve(c,880,485,965,455,972,398); P.qcurve(c,878,545,990,520,972,398); // 壺嘴
+    P.arc(c,612,512,55,Math.PI*0.6,Math.PI*1.5);                     // 把手
+    P.poly(c,[[520,660],[640,660],[620,730],[540,730]]);             // 茶杯
+    P.ellipse(c,580,660,60,13);
+    P.qcurve(c,560,620,575,595,560,568); P.qcurve(c,600,620,615,595,600,568); // 蒸氣
+    drawHeart(c,1010,230,32);
+  });}},
+  { name:"音樂時光", draw(c){ withOutline(c, c => {
+    devilHead(c,600,330,130);
+    P.ellipse(c,600,565,105,105);
+    P.arc(c,600,320,178,Math.PI*1.05,Math.PI*1.95);                  // 耳機頭帶
+    P.ellipse(c,422,348,30,48,0.15); P.ellipse(c,778,348,30,48,-0.15);
+    musicNote(c,250,255,52); musicNote(c,945,220,60); musicNote(c,1000,485,45);
+  });}},
+  { name:"愛心氣球", draw(c){ withOutline(c, c => {
+    devilHead(c,480,460,125);
+    P.ellipse(c,480,690,100,80);
+    P.ellipse(c,598,558,32,52,-0.8);                                 // 舉手
+    drawHeart(c,800,250,110); P.curve(c,[[800,362],[778,450],[640,542]]);
+    P.circle(c,990,380,55); P.curve(c,[[990,436],[948,500],[655,558]]);
+    star5(c,220,300,30); drawHeart(c,282,552,26);
+  });}},
+  { name:"南瓜派對", draw(c){ withOutline(c, c => {
+    devilHead(c,420,290,115);
+    P.ellipse(c,420,500,92,92);
+    P.ellipse(c,800,560,200,150); P.ellipse(c,800,560,110,150); P.ellipse(c,800,560,40,150); // 南瓜
+    P.poly(c,[[785,408],[790,350],[830,345],[822,410]]);             // 梗
+    P.qcurve(c,840,362,890,330,900,290);                             // 藤蔓
+    star5(c,240,180,30); star5(c,1080,262,24);
+  });}},
+  { name:"雨天散步", draw(c){ withOutline(c, c => {
+    devilHead(c,620,430,115);
+    P.ellipse(c,620,640,95,88);
+    P.arc(c,620,255,230,Math.PI,Math.PI*2);                          // 傘面
+    P.arc(c,447,255,58,0,Math.PI); P.arc(c,562,255,58,0,Math.PI); P.arc(c,678,255,58,0,Math.PI); P.arc(c,793,255,58,0,Math.PI); // 波浪緣
+    P.seg(c,620,255,620,40); P.seg(c,620,255,620,308);               // 傘桿
+    const drop = (x,y) => P.seg(c,x,y,x-12,y+30);
+    drop(210,320); drop(280,470); drop(160,570); drop(1000,330); drop(1060,480); drop(950,590);
+  });}},
+];
+
+/* ══ 口袋小怪獸系列（原創） ══ */
+const PAGES_MON = [
+  { name:"圓滾獸", draw(c){ withOutline(c, c => {
+    P.circle(c,600,430,210);
+    P.ellipse(c,440,215,55,90,-0.5); P.ellipse(c,760,215,55,90,0.5);
+    P.circle(c,520,380,26); P.circle(c,680,380,26); P.dot(c,520,380,9); P.dot(c,680,380,9);
+    P.circle(c,448,460,28); P.circle(c,752,460,28);                  // 腮紅圈
+    P.arc(c,600,468,40,0.25,Math.PI-0.25);
+    star5(c,600,562,46);
+    P.ellipse(c,502,652,45,25); P.ellipse(c,698,652,45,25);
+  });}},
+  { name:"葉芽獸", draw(c){ withOutline(c, c => {
+    P.ellipse(c,600,500,170,150);
+    P.seg(c,600,352,600,262);
+    P.ellipse(c,538,228,62,30,-0.5); P.ellipse(c,662,228,62,30,0.5);
+    P.circle(c,545,468,20); P.circle(c,655,468,20); P.dot(c,545,468,7); P.dot(c,655,468,7);
+    P.arc(c,600,540,30,0.3,Math.PI-0.3);
+    P.arc(c,600,505,100,Math.PI*0.2,Math.PI*0.8);                    // 肚紋
+    P.ellipse(c,522,648,42,22); P.ellipse(c,678,648,42,22);
+  });}},
+  { name:"火花獸", draw(c){ withOutline(c, c => {
+    P.blob(c,[[600,120],[720,235],[748,400],[692,522],[600,562],[508,522],[452,400],[480,235]]);
+    P.blob(c,[[600,262],[658,330],[642,428],[600,455],[558,428],[542,330]]);
+    P.circle(c,548,350,18); P.circle(c,652,350,18); P.dot(c,548,350,6); P.dot(c,652,350,6);
+    P.arc(c,600,398,24,0.3,Math.PI-0.3);
+    P.ellipse(c,520,640,48,26); P.ellipse(c,680,640,48,26);
+    P.qcurve(c,745,470,850,500,895,435);
+    P.blob(c,[[895,435],[945,378],[935,448],[962,466],[900,492]]);   // 尾焰
+  });}},
+  { name:"水滴獸", draw(c){ withOutline(c, c => {
+    P.blob(c,[[600,150],[700,320],[722,470],[642,560],[558,560],[478,470],[500,320]]);
+    P.circle(c,552,400,20); P.circle(c,648,400,20); P.dot(c,552,400,7); P.dot(c,648,400,7);
+    P.arc(c,600,458,26,0.3,Math.PI-0.3);
+    P.ellipse(c,468,522,45,22,0.6); P.ellipse(c,732,522,45,22,-0.6); // 鰭
+    P.circle(c,300,250,26); P.circle(c,250,168,18); P.circle(c,942,300,22); P.circle(c,995,205,16);
+    P.curve(c,[[150,720],[400,690],[700,715],[1050,690]]);           // 水面
+  });}},
+  { name:"岩殼獸", draw(c){ withOutline(c, c => {
+    P.arc(c,620,480,210,Math.PI,Math.PI*2); P.seg(c,410,480,830,480);
+    P.poly(c,[[540,340],[620,292],[700,340],[668,420],[572,420]]);   // 殼板
+    P.poly(c,[[452,432],[518,372],[558,452]]); P.poly(c,[[788,432],[722,372],[682,452]]);
+    P.circle(c,330,415,68);                                           // 頭
+    P.seg(c,388,380,428,352); P.seg(c,392,452,432,470);              // 頸
+    P.dot(c,312,402,8); P.arc(c,325,438,18,0.3,Math.PI-0.3);
+    P.ellipse(c,500,560,52,36); P.ellipse(c,740,560,52,36);
+  });}},
+  { name:"綿雲獸", draw(c){ withOutline(c, c => {
+    P.blob(c,[[430,380],[470,298],[560,258],[612,300],[662,250],[752,290],[802,380],[762,470],[652,512],[540,506],[452,470]]);
+    P.circle(c,555,385,18); P.circle(c,655,385,18); P.dot(c,555,385,6); P.dot(c,655,385,6);
+    P.arc(c,605,430,24,0.3,Math.PI-0.3);
+    P.circle(c,505,425,20); P.circle(c,705,425,20);
+    P.ellipse(c,545,555,38,20); P.ellipse(c,668,555,38,20);
+    star5(c,240,200,32); star5(c,980,230,28); P.circle(c,1050,480,30);
+  });}},
+  { name:"星光獸", draw(c){ withOutline(c, c => {
+    star5(c,600,420,265);
+    P.circle(c,545,390,20); P.circle(c,655,390,20); P.dot(c,545,390,7); P.dot(c,655,390,7);
+    P.arc(c,600,448,28,0.3,Math.PI-0.3);
+    P.circle(c,502,432,20); P.circle(c,698,432,20);
+    star5(c,215,195,40); star5(c,990,245,34); star5(c,935,620,28); star5(c,220,600,24);
+  });}},
+  { name:"菇菇獸", draw(c){ withOutline(c, c => {
+    P.arc(c,600,400,230,Math.PI,Math.PI*2);
+    P.qcurve(c,370,400,600,472,830,400);                             // 帽底
+    P.circle(c,478,282,34); P.circle(c,652,222,28); P.circle(c,732,330,24);
+    P.blob(c,[[520,455],[680,455],[702,600],[600,652],[498,600]]);   // 臉身
+    P.circle(c,560,525,17); P.circle(c,640,525,17); P.dot(c,560,525,6); P.dot(c,640,525,6);
+    P.arc(c,600,572,22,0.3,Math.PI-0.3);
+    P.ellipse(c,542,682,40,22); P.ellipse(c,658,682,40,22);
+  });}},
+  { name:"月牙獸", draw(c){ withOutline(c, c => {
+    c.beginPath(); c.arc(600,400,235,Math.PI*0.35,Math.PI*1.65);
+    c.arc(688,400,205,Math.PI*1.58,Math.PI*0.42,true); c.closePath(); c.stroke();
+    P.circle(c,432,505,18); P.circle(c,522,555,18); P.dot(c,432,505,6); P.dot(c,522,555,6);
+    P.arc(c,478,565,22,0.5,Math.PI-0.1);
+    star5(c,860,190,40); star5(c,950,420,30); star5(c,830,640,26); star5(c,240,170,28);
+  });}},
+  { name:"小龍獸", draw(c){ withOutline(c, c => {
+    P.ellipse(c,580,480,160,135);
+    P.circle(c,580,262,110);
+    P.poly(c,[[520,168],[498,92],[560,142]]); P.poly(c,[[640,168],[662,92],[600,142]]); // 角
+    P.circle(c,540,245,18); P.circle(c,620,245,18); P.dot(c,540,245,6); P.dot(c,620,245,6);
+    P.arc(c,580,300,26,0.3,Math.PI-0.3);
+    P.blob(c,[[722,405],[832,332],[882,382],[802,452],[732,462]]);   // 右翼
+    P.blob(c,[[438,405],[328,332],[278,382],[358,452],[428,462]]);   // 左翼
+    P.arc(c,580,500,88,Math.PI*0.2,Math.PI*0.8); P.arc(c,580,455,88,Math.PI*0.2,Math.PI*0.8); // 肚紋
+    P.qcurve(c,720,565,830,615,898,562); P.poly(c,[[898,562],[948,530],[930,592]]); // 尾
+    P.ellipse(c,502,640,45,24); P.ellipse(c,658,640,45,24);
+  });}},
+];
+
+/* ══ 冰雪王國系列（原創） ══ */
+const PAGES_ICE = [
+  { name:"冰雪公主", draw(c){ withOutline(c, c => {
+    P.circle(c,600,250,95);
+    P.poly(c,[[540,168],[560,120],[585,158],[600,108],[615,158],[640,120],[660,168]]); // 皇冠
+    P.dot(c,565,240,7); P.dot(c,635,240,7); P.arc(c,600,278,20,0.3,Math.PI-0.3);
+    P.curve(c,[[508,262],[468,380],[500,500],[458,620]]);            // 辮子
+    P.ellipse(c,462,662,34,42,0.3);
+    P.seg(c,470,392,512,402); P.seg(c,478,478,518,486); P.seg(c,466,568,506,578);
+    P.poly(c,[[522,345],[678,345],[790,720],[410,720]]);             // 禮服
+    P.curve(c,[[410,720],[500,688],[600,720],[700,688],[790,720]]);  // 裙襬
+    P.seg(c,538,432,662,432);                                        // 腰帶
+    P.ellipse(c,505,478,26,78,0.35); P.ellipse(c,695,478,26,78,-0.35); // 手
+    snowflake(c,250,200,45); snowflake(c,950,180,55); snowflake(c,1005,500,40); snowflake(c,200,550,35);
+  });}},
+  { name:"冰雪城堡", draw(c){ withOutline(c, c => {
+    P.poly(c,[[520,700],[520,300],[680,300],[680,700]]); P.poly(c,[[500,300],[600,168],[700,300]]);
+    P.poly(c,[[330,700],[330,420],[440,420],[440,700]]); P.poly(c,[[315,420],[385,318],[455,420]]);
+    P.poly(c,[[760,700],[760,420],[870,420],[870,700]]); P.poly(c,[[745,420],[815,318],[885,420]]);
+    P.arc(c,600,700,60,Math.PI,Math.PI*2);                           // 大門
+    P.circle(c,600,385,28); P.circle(c,385,505,22); P.circle(c,815,505,22);
+    P.seg(c,600,168,600,98); P.poly(c,[[600,98],[660,113],[600,128]]);
+    P.seg(c,385,318,385,262); P.poly(c,[[385,262],[430,274],[385,286]]);
+    P.seg(c,815,318,815,262); P.poly(c,[[815,262],[860,274],[815,286]]);
+    P.arc(c,290,760,120,Math.PI,Math.PI*2); P.arc(c,910,760,140,Math.PI,Math.PI*2); P.seg(c,100,760,1100,760);
+    snowflake(c,180,180,40); snowflake(c,1020,180,44); snowflake(c,600,60,0);
+  });}},
+  { name:"快樂雪人", draw(c){ withOutline(c, c => {
+    P.circle(c,600,250,100); P.circle(c,600,450,140); P.circle(c,600,645,150);
+    P.poly(c,[[520,182],[680,182],[662,142],[538,142]]); P.poly(c,[[540,142],[660,142],[645,62],[555,62]]); // 高帽
+    P.dot(c,565,232,8); P.dot(c,635,232,8);
+    P.poly(c,[[600,262],[668,282],[600,298]]);                       // 蘿蔔鼻
+    P.arc(c,600,308,30,0.4,Math.PI-0.4);
+    P.seg(c,462,428,332,340); P.seg(c,332,340,300,300); P.seg(c,332,340,286,356); // 樹枝手
+    P.seg(c,738,428,868,340); P.seg(c,868,340,900,300); P.seg(c,868,340,914,356);
+    P.circle(c,600,420,12); P.circle(c,600,472,12); P.circle(c,600,625,14);
+    P.curve(c,[[512,332],[600,368],[688,332]]); P.curve(c,[[515,358],[600,395],[685,358]]); // 圍巾
+    P.poly(c,[[655,362],[695,462],[738,445],[700,352]]);
+    snowflake(c,200,200,40); snowflake(c,1000,250,45); snowflake(c,1030,580,32);
+  });}},
+  { name:"六角雪花", draw(c){ withOutline(c, c => {
+    P.circle(c,600,400,60);
+    for (let i = 0; i < 6; i++) {
+      const a = i*Math.PI/3, cx = Math.cos(a), sy = Math.sin(a);
+      P.seg(c,600+cx*60,400+sy*60,600+cx*298,400+sy*298);
+      P.seg(c,600+cx*180,400+sy*180,600+cx*180+Math.cos(a+1.05)*68,400+sy*180+Math.sin(a+1.05)*68);
+      P.seg(c,600+cx*180,400+sy*180,600+cx*180+Math.cos(a-1.05)*68,400+sy*180+Math.sin(a-1.05)*68);
+      const tx = 600+cx*298, ty = 400+sy*298;
+      P.poly(c,[[tx+cx*52,ty+sy*52],[tx+Math.cos(a+Math.PI/2)*26,ty+Math.sin(a+Math.PI/2)*26],[tx-cx*28,ty-sy*28],[tx+Math.cos(a-Math.PI/2)*26,ty+Math.sin(a-Math.PI/2)*26]]);
+      P.circle(c,600+cx*115,400+sy*115,20);
+    }
+  });}},
+  { name:"紅鼻馴鹿", draw(c){ withOutline(c, c => {
+    P.circle(c,600,420,150);
+    P.ellipse(c,600,505,85,58);                                      // 口鼻
+    P.circle(c,600,478,32);                                          // 圓鼻
+    P.dot(c,545,375,9); P.dot(c,655,375,9);
+    P.ellipse(c,452,328,42,66,-0.6); P.ellipse(c,748,328,42,66,0.6);
+    P.seg(c,505,268,452,142); P.seg(c,475,205,402,172); P.seg(c,462,168,412,105); // 左角
+    P.seg(c,695,268,748,142); P.seg(c,725,205,798,172); P.seg(c,738,168,788,105);
+    P.curve(c,[[472,548],[600,595],[728,548]]); P.curve(c,[[478,578],[600,628],[722,578]]); // 圍巾
+    snowflake(c,210,210,42); snowflake(c,990,200,46); snowflake(c,1030,560,30);
+  });}},
+  { name:"溜冰企鵝", draw(c){ withOutline(c, c => {
+    P.blob(c,[[600,180],[700,240],[730,400],[700,540],[600,588],[500,540],[470,400],[500,240]]);
+    P.blob(c,[[600,300],[660,340],[670,450],[640,528],[600,548],[560,528],[530,450],[540,340]]);
+    P.dot(c,558,268,8); P.dot(c,642,268,8);
+    P.poly(c,[[600,298],[650,318],[600,338]]);
+    P.ellipse(c,468,400,28,72,0.5); P.ellipse(c,732,400,28,72,-0.5);
+    P.ellipse(c,545,612,45,20); P.ellipse(c,665,612,45,20);          // 冰鞋
+    P.seg(c,505,645,590,645); P.seg(c,620,645,705,645);              // 冰刀
+    P.seg(c,380,700,860,700);
+    P.qcurve(c,368,690,300,662,258,612);                             // 滑痕
+    snowflake(c,220,220,40); snowflake(c,980,300,46);
+  });}},
+  { name:"圍巾北極熊", draw(c){ withOutline(c, c => {
+    P.circle(c,600,380,190);
+    P.circle(c,448,232,55); P.circle(c,752,232,55);
+    P.circle(c,452,238,26); P.circle(c,748,238,26);
+    P.ellipse(c,600,462,95,68); P.ellipse(c,600,428,34,24);
+    P.dot(c,528,328,10); P.dot(c,672,328,10);
+    P.arc(c,600,482,34,0.4,Math.PI-0.4);
+    P.curve(c,[[442,542],[600,600],[758,542]]); P.curve(c,[[448,575],[600,638],[752,575]]);
+    P.poly(c,[[518,592],[498,700],[560,700],[566,608]]);
+    P.seg(c,508,700,508,722); P.seg(c,530,705,530,726); P.seg(c,552,700,552,722);
+    snowflake(c,200,200,42); snowflake(c,1000,218,36); snowflake(c,1035,548,30);
+  });}},
+  { name:"冰晶玫瑰窗", draw(c){ withOutline(c, c => {
+    P.circle(c,600,400,298); P.circle(c,600,400,238); P.circle(c,600,400,70);
+    for (let i = 0; i < 8; i++) {
+      const a = i*Math.PI/4;
+      const x0 = 600+Math.cos(a)*70, y0 = 400+Math.sin(a)*70;
+      const xm = 600+Math.cos(a)*238, ym = 400+Math.sin(a)*238;
+      P.qcurve(c,x0,y0,600+Math.cos(a+0.35)*168,400+Math.sin(a+0.35)*168,xm,ym);
+      P.qcurve(c,x0,y0,600+Math.cos(a-0.35)*168,400+Math.sin(a-0.35)*168,xm,ym);
+      P.circle(c,600+Math.cos(a+Math.PI/8)*268,400+Math.sin(a+Math.PI/8)*268,20);
+    }
+  });}},
+  { name:"雪橇禮物", draw(c){ withOutline(c, c => {
+    P.qcurve(c,280,650,240,608,252,552);                             // 雪橇前翹
+    P.seg(c,280,650,900,650); P.qcurve(c,900,650,952,628,962,575);
+    P.seg(c,330,585,878,585); P.seg(c,390,585,390,650); P.seg(c,810,585,810,650);
+    P.poly(c,[[420,585],[420,432],[620,432],[620,585]]); P.seg(c,520,432,520,585); // 大禮盒
+    P.poly(c,[[640,585],[640,472],[800,472],[800,585]]); P.seg(c,720,472,720,585);
+    P.poly(c,[[470,432],[470,312],[590,312],[590,432]]); P.seg(c,530,312,530,432);
+    P.ellipse(c,505,295,24,13,-0.4); P.ellipse(c,555,295,24,13,0.4); // 蝴蝶結
+    P.seg(c,150,722,1050,722);
+    snowflake(c,180,180,38); snowflake(c,1010,200,44); snowflake(c,950,420,28);
+  });}},
+  { name:"極光小屋", draw(c){ withOutline(c, c => {
+    P.curve(c,[[150,200],[400,120],[700,180],[1050,100]]);           // 極光
+    P.curve(c,[[150,262],[400,182],[700,242],[1050,162]]);
+    P.curve(c,[[150,324],[400,244],[700,304],[1050,224]]);
+    P.circle(c,170,110,42);                                          // 月亮
+    P.poly(c,[[100,620],[330,352],[560,620]]); P.poly(c,[[480,620],[750,382],[1020,620]]); // 山
+    P.poly(c,[[560,620],[560,500],[760,500],[760,620]]);             // 小屋
+    P.poly(c,[[540,500],[660,420],[780,500]]);
+    P.poly(c,[[600,620],[600,552],[650,552],[650,620]]);             // 門
+    P.circle(c,715,548,22);                                          // 窗
+    P.poly(c,[[690,455],[690,388],[724,388],[724,472]]);             // 煙囪
+    P.poly(c,[[280,620],[330,540],[380,620]]); P.poly(c,[[292,562],[330,492],[368,562]]); // 松樹
+    P.poly(c,[[890,620],[940,540],[990,620]]); P.poly(c,[[902,562],[940,492],[978,562]]);
+    P.seg(c,60,620,1140,620);
+    snowflake(c,900,120,30); snowflake(c,240,430,26);
+  });}},
+];
+
+/* ══ 動物城市系列（原創） ══ */
+const PAGES_CITY = [
+  { name:"狐狸偵探", draw(c){ withOutline(c, c => {
+    P.blob(c,[[600,205],[728,262],[758,380],[600,468],[442,380],[472,262]]); // 尖臉
+    P.poly(c,[[478,258],[432,132],[558,208]]); P.poly(c,[[722,258],[768,132],[642,208]]);
+    P.dot(c,545,330,9); P.dot(c,655,330,9);
+    P.blob(c,[[600,378],[652,400],[600,436],[548,400]]); P.dot(c,600,384,10); // 口鼻
+    P.ellipse(c,600,205,185,38); P.arc(c,600,200,118,Math.PI,Math.PI*2);      // 偵探帽
+    P.circle(c,898,478,95); P.circle(c,898,478,68);                            // 放大鏡
+    P.poly(c,[[955,558],[1040,648],[1008,672],[928,582]]);
+    P.poly(c,[[520,468],[680,468],[722,700],[478,700]]);                       // 大衣
+    P.seg(c,600,478,600,700);
+    P.poly(c,[[520,468],[562,522],[600,472]]); P.poly(c,[[680,468],[638,522],[600,472]]); // 領子
+  });}},
+  { name:"兔子麵包師", draw(c){ withOutline(c, c => {
+    P.circle(c,600,370,150);
+    P.ellipse(c,438,262,38,85,-0.5); P.ellipse(c,762,262,38,85,0.5); // 耳
+    P.blob(c,[[472,242],[492,152],[562,120],[600,140],[638,120],[708,152],[728,242]]); // 廚師帽
+    P.poly(c,[[472,242],[728,242],[728,282],[472,282]]);
+    P.dot(c,545,360,9); P.dot(c,655,360,9);
+    P.circle(c,600,408,15);
+    P.seg(c,600,423,600,440);
+    P.arc(c,578,448,20,0.2,Math.PI-0.2); P.arc(c,622,448,20,0.2,Math.PI-0.2);
+    P.ellipse(c,600,645,230,68,0.06);                                // 法國麵包
+    P.seg(c,480,605,520,652); P.seg(c,562,592,602,645); P.seg(c,645,592,685,642); P.seg(c,725,602,758,648);
+  });}},
+  { name:"熊熊消防員", draw(c){ withOutline(c, c => {
+    P.circle(c,560,420,160);
+    P.circle(c,432,300,48); P.circle(c,688,300,48);
+    P.ellipse(c,560,488,80,54); P.ellipse(c,560,462,30,22);
+    P.dot(c,502,382,10); P.dot(c,618,382,10);
+    P.arc(c,560,502,34,0.45,Math.PI-0.45);
+    P.arc(c,560,290,132,Math.PI,Math.PI*2);                          // 消防帽
+    P.ellipse(c,560,292,172,28);
+    P.poly(c,[[535,205],[585,205],[578,252],[542,252]]);             // 帽徽
+    P.poly(c,[[930,700],[930,505],[1050,505],[1050,700]]);           // 消防栓
+    P.arc(c,990,505,60,Math.PI,Math.PI*2);
+    P.circle(c,990,432,16);
+    P.circle(c,930,575,26); P.circle(c,1050,575,26);
+    P.seg(c,895,700,1085,700);
+  });}},
+  { name:"貓咪醫生", draw(c){ withOutline(c, c => {
+    P.circle(c,600,400,160);
+    P.poly(c,[[478,302],[432,172],[558,252]]); P.poly(c,[[722,302],[768,172],[642,252]]);
+    P.dot(c,540,372,9); P.dot(c,660,372,9);
+    P.poly(c,[[600,420],[585,445],[615,445]]);
+    P.arc(c,578,462,20,0.2,Math.PI-0.2); P.arc(c,622,462,20,0.2,Math.PI-0.2);
+    P.seg(c,452,400,330,382); P.seg(c,456,432,336,446);              // 鬍鬚
+    P.seg(c,748,400,870,382); P.seg(c,744,432,864,446);
+    P.arc(c,600,318,152,Math.PI*1.18,Math.PI*1.82);                  // 額鏡帶
+    P.circle(c,600,215,44); P.circle(c,600,215,25);
+    P.curve(c,[[520,552],[498,640],[560,692],[660,700],[732,662]]);  // 聽診管
+    P.circle(c,762,628,40); P.circle(c,762,628,22);
+  });}},
+  { name:"大象老師", draw(c){ withOutline(c, c => {
+    P.circle(c,600,360,165);
+    P.ellipse(c,398,368,88,125,-0.2); P.ellipse(c,802,368,88,125,0.2); // 大耳
+    P.circle(c,545,325,38); P.circle(c,665,325,38); P.seg(c,583,325,627,325); // 眼鏡
+    P.seg(c,507,325,470,312); P.seg(c,703,325,740,312);
+    P.dot(c,545,325,8); P.dot(c,665,325,8);
+    P.curve(c,[[565,435],[548,540],[612,608],[712,598]]);            // 象鼻
+    P.curve(c,[[605,430],[595,518],[645,566],[705,558]]);
+    P.seg(c,572,478,616,488); P.seg(c,562,520,610,534);
+    P.poly(c,[[398,652],[595,622],[595,752],[398,782]]);             // 書左頁
+    P.poly(c,[[802,652],[605,622],[605,752],[802,782]]);
+    P.seg(c,455,672,555,658); P.seg(c,455,706,555,692); P.seg(c,645,658,745,672); P.seg(c,645,692,745,706);
+  });}},
+  { name:"企鵝服務生", draw(c){ withOutline(c, c => {
+    P.blob(c,[[560,170],[655,225],[685,380],[660,520],[560,565],[460,520],[435,380],[465,225]]);
+    P.blob(c,[[560,272],[615,310],[625,430],[595,510],[560,525],[525,510],[495,430],[505,310]]);
+    P.dot(c,522,250,8); P.dot(c,598,250,8);
+    P.poly(c,[[560,275],[605,292],[560,310]]);
+    P.poly(c,[[520,332],[600,332],[560,372]]);                        // 領結
+    P.poly(c,[[520,332],[480,308],[480,362]]); P.poly(c,[[600,332],[640,308],[640,362]]);
+    P.ellipse(c,432,400,26,68,0.45);
+    P.ellipse(c,725,335,26,68,-1.15);                                 // 舉盤翅
+    P.ellipse(c,835,262,110,25);                                      // 托盤
+    P.poly(c,[[788,238],[884,238],[874,178],[798,178]]);              // 杯子
+    P.qcurve(c,815,162,825,132,813,108); P.qcurve(c,855,162,865,132,853,108); // 蒸氣
+    P.ellipse(c,508,598,45,20); P.ellipse(c,615,598,45,20);
+  });}},
+  { name:"浣熊畫家", draw(c){ withOutline(c, c => {
+    P.circle(c,600,390,160);
+    P.poly(c,[[482,280],[440,188],[548,242]]); P.poly(c,[[718,280],[760,188],[652,242]]);
+    P.ellipse(c,538,368,52,34,0.25); P.ellipse(c,662,368,52,34,-0.25); // 眼罩
+    P.dot(c,538,368,9); P.dot(c,662,368,9);
+    P.dot(c,600,438,10); P.arc(c,600,462,24,0.3,Math.PI-0.3);
+    P.ellipse(c,600,250,148,52);                                      // 貝雷帽
+    P.seg(c,600,198,600,168); P.circle(c,600,155,12);
+    P.blob(c,[[878,522],[1008,482],[1078,542],[1048,640],[928,660],[858,600]]); // 調色盤
+    P.circle(c,948,558,16); P.circle(c,1008,545,14); P.circle(c,1028,595,14); P.circle(c,958,613,13);
+    P.seg(c,352,700,468,562); P.poly(c,[[468,562],[498,527],[510,556],[482,578]]); // 畫筆
+  });}},
+  { name:"河馬司機", draw(c){ withOutline(c, c => {
+    P.ellipse(c,600,315,150,118);
+    P.ellipse(c,600,428,190,105);                                     // 大口鼻
+    P.circle(c,542,415,16); P.circle(c,658,415,16);
+    P.dot(c,545,282,9); P.dot(c,655,282,9);
+    P.circle(c,462,222,30); P.circle(c,738,222,30);
+    P.arc(c,600,212,102,Math.PI,Math.PI*2);                           // 司機帽
+    P.ellipse(c,600,214,128,20);
+    P.poly(c,[[512,232],[688,232],[652,265],[548,265]]);              // 帽簷
+    P.circle(c,600,655,105); P.circle(c,600,655,76); P.circle(c,600,655,22); // 方向盤
+    P.seg(c,600,677,600,731); P.seg(c,580,644,530,616); P.seg(c,620,644,670,616);
+  });}},
+  { name:"老虎歌手", draw(c){ withOutline(c, c => {
+    P.circle(c,560,390,160);
+    P.circle(c,442,272,45); P.circle(c,678,272,45);
+    P.dot(c,502,362,9); P.dot(c,618,362,9);
+    P.poly(c,[[560,408],[543,433],[577,433]]);
+    P.arc(c,538,455,20,0.2,Math.PI-0.2); P.arc(c,582,455,20,0.2,Math.PI-0.2);
+    P.poly(c,[[415,335],[462,350],[415,368]]); P.poly(c,[[705,335],[658,350],[705,368]]); // 虎紋
+    P.poly(c,[[520,242],[535,282],[505,275]]); P.poly(c,[[600,242],[585,282],[615,275]]);
+    P.circle(c,900,470,60);                                           // 麥克風
+    P.seg(c,852,442,948,498); P.seg(c,852,498,948,442);
+    P.poly(c,[[875,522],[925,522],[908,692],[892,692]]);
+    musicNote(c,300,240,55); musicNote(c,1035,255,45); musicNote(c,255,510,40);
+  });}},
+  { name:"狗狗警察", draw(c){ withOutline(c, c => {
+    P.circle(c,600,390,160);
+    P.ellipse(c,452,392,55,102,0.35); P.ellipse(c,748,392,55,102,-0.35); // 垂耳
+    P.dot(c,545,358,9); P.dot(c,655,358,9);
+    P.ellipse(c,600,452,60,42); P.ellipse(c,600,430,24,17);
+    P.arc(c,600,472,26,0.35,Math.PI-0.35);
+    P.arc(c,600,258,115,Math.PI,Math.PI*2);                           // 警帽
+    P.poly(c,[[485,258],[715,258],[715,288],[485,288]]);
+    P.poly(c,[[502,288],[698,288],[658,318],[542,318]]);
+    star5(c,600,205,30);                                              // 帽徽
+    P.circle(c,340,600,80); star5(c,340,600,52);                      // 警徽
+    P.circle(c,880,600,40); P.poly(c,[[916,585],[990,570],[990,615],[918,616]]); P.dot(c,880,600,10); // 哨子
+  });}},
+];
+
+/* 向量線稿集合（手繪，顯示於著色本前段分頁） */
+const VECTOR_SETS = {
+  "🏞️ 經典場景": PAGES,
+  "🖤 甜酷小惡魔": PAGES_DEVIL,
+  "👾 口袋小怪獸": PAGES_MON,
+  "❄️ 冰雪王國": PAGES_ICE,
+  "🏙️ 動物城市": PAGES_CITY,
+};
+
 /* ══════════════ 線稿轉換引擎（彩圖 → 黑線白底著色圖） ══════════════ */
 function boxBlur(a, w, h, r) {
   if (r <= 0) return;
@@ -869,7 +1350,6 @@ function emojiColoringPage(emoji, w = W, h = H, dilate = 2) {
 
 /* ══════════════ 著色圖庫（卡通角色線稿） ══════════════ */
 const EMOJI_PAGE_SETS = {
-  "😀 表情臉譜": ["😀","😄","😁","😆","😅","😂","🙂","😉","😊","😇","😍","🥰","😘","😋","😛","😜","🤪","🤗","🤭","🤔","🤨","😏","😴","🤤","😷","🤒","🤕","🤢","🥵","🥶","🤯","🤠","🥳","😎","🤓","🧐","😲","😳","🥺","😨","😢","😭","😱","😤","😡","😈","💀","👻","👽","🤖","🤡","🎃","😺","😸","😻","🙀"],
   "🧑 人物角色": ["👶","🧒","👦","👧","🧑","👨","👩","🧔","👴","👵","👼","🤴","👸","🤵","👰","🤰","🎅","🤶","🦸","🦹","🧙","🧚","🧛","🧜","🧝","🧞","🧟","💂","👮","👷","🕵️","👳","🧕","💃","🕺","🚶","🏃","🤺","🏇","⛷️","🏂","🏄","🚣","🏊","⛹️","🏋️","🚴","🚵","🤸","🤹","🧘","🛀","👨‍⚕️","👩‍⚕️","👨‍🎓","👩‍🎓","👨‍🏫","👩‍🏫","👨‍🌾","👩‍🌾","👨‍🍳","👩‍🍳","👨‍🔧","👩‍🔧","👨‍🔬","👩‍🔬","👨‍🎤","👩‍🎤","👨‍🎨","👩‍🎨","👨‍✈️","👩‍✈️","👨‍🚀","👩‍🚀","👨‍🚒","👩‍🚒","👨‍💻","👩‍💻"],
   "🐾 動物王國": ["🐶","🐕","🦮","🐩","🐺","🦊","🦝","🐱","🐈","🦁","🐯","🐅","🐆","🐴","🐎","🦄","🦓","🦌","🐮","🐂","🐃","🐄","🐷","🐖","🐗","🐏","🐑","🐐","🐪","🐫","🦙","🦒","🐘","🦏","🦛","🐭","🐹","🐰","🐇","🐿️","🦔","🦇","🐻","🐨","🐼","🦥","🦦","🦨","🦘","🦡","🦃","🐔","🐓","🐣","🐤","🐥","🐦","🐧","🕊️","🦅","🦆","🦢","🦉","🦩","🦚","🦜","🐸","🐊","🐢","🦎","🐍","🐲","🐉","🦕","🦖","🐳","🐋","🐬","🐟","🐠","🐡","🦈","🐙","🐚","🦀","🦞","🦐","🦑","🐌","🦋","🐛","🐜","🐝","🐞","🦗","🕷️","🦂","🙈","🙉","🙊"],
   "🍎 美味食物": ["🍏","🍎","🍐","🍊","🍋","🍌","🍉","🍇","🍓","🍈","🍒","🍑","🥭","🍍","🥥","🥝","🍅","🍆","🥑","🥦","🥒","🌶️","🌽","🥕","🥔","🍠","🥐","🍞","🥖","🥨","🧀","🥚","🍳","🥞","🧇","🍗","🍖","🌭","🍔","🍟","🍕","🥪","🌮","🌯","🥗","🍝","🍜","🍲","🍛","🍣","🍱","🥟","🍤","🍙","🍚","🧁","🍰","🎂","🍮","🍭","🍬","🍫","🍿","🍩","🍪","🥛","☕","🧃","🥤","🍦","🍨"],
@@ -891,12 +1371,13 @@ const EMOJI_PAGE_SETS = {
     });
   }
 })();
-const TOTAL_PAGES = PAGES.length + Object.values(EMOJI_PAGE_SETS).reduce((a, s) => a + s.length, 0);
+const TOTAL_PAGES = Object.values(VECTOR_SETS).reduce((a, s) => a + s.length, 0)
+                  + Object.values(EMOJI_PAGE_SETS).reduce((a, s) => a + s.length, 0);
 document.getElementById("coloringTitle").textContent = `著色本 · 共 ${TOTAL_PAGES} 張 — 選擇線稿，以油漆桶上色`;
 
 /* ── 著色本分頁 ── */
 const CLASSIC_TAB = "🏞️ 經典場景", PHOTO_TAB = "📷 照片變線稿";
-const COLOR_TABS = [CLASSIC_TAB, ...Object.keys(EMOJI_PAGE_SETS), PHOTO_TAB];
+const COLOR_TABS = [...Object.keys(VECTOR_SETS), ...Object.keys(EMOJI_PAGE_SETS), PHOTO_TAB];
 let currentColorTab = CLASSIC_TAB;
 let coloringBuilt = false;
 const pageGrid = document.getElementById("pageGrid");
@@ -914,11 +1395,14 @@ function renderColoringTab() {
   document.getElementById("photoPanel").classList.toggle("show", currentColorTab === PHOTO_TAB);
   pageGrid.innerHTML = "";
   if (currentColorTab === PHOTO_TAB) return;
-  if (currentColorTab === CLASSIC_TAB) {
-    PAGES.forEach((p, i) => {
+  const vec = VECTOR_SETS[currentColorTab];
+  if (vec) {
+    const tabKey = currentColorTab;
+    vec.forEach((p, i) => {
       const card = document.createElement("button");
       card.className = "pageCard";
-      let th = thumbCache.get("classic:" + i);
+      const ck = `vec:${tabKey}:${i}`;
+      let th = thumbCache.get(ck);
       if (!th) {
         th = document.createElement("canvas");
         th.width = 300; th.height = 200;
@@ -926,13 +1410,13 @@ function renderColoringTab() {
         tc.fillStyle = "#fff"; tc.fillRect(0,0,300,200);
         tc.scale(300 / W, 200 / H);
         p.draw(tc);
-        thumbCache.set("classic:" + i, th);
+        thumbCache.set(ck, th);
       }
       card.appendChild(th);
       const nm = document.createElement("div");
       nm.className = "pname"; nm.textContent = p.name;
       card.appendChild(nm);
-      card.addEventListener("click", () => loadColoringPage(i));
+      card.addEventListener("click", () => loadVectorPage(tabKey, i));
       pageGrid.appendChild(card);
     });
     return;
@@ -979,17 +1463,19 @@ function queueThumb(em, apply) {
   else thumbQueue.push({ em });
   pumpThumbs();
 }
-function loadColoringPage(i) {
+function loadVectorPage(setName, i) {
+  const page = VECTOR_SETS[setName][i];
   pushUndo();
   ctx.clearRect(0,0,W,H);
   ctx.save();
   ctx.fillStyle = "#ffffff"; ctx.fillRect(0,0,W,H); // 著色底一律白色
-  PAGES[i].draw(ctx);
+  page.draw(ctx);
   ctx.restore();
   closeDrawer("coloringDrawer");
   setTool("bucket");
-  toast(`已載入「${PAGES[i].name}」— 以油漆桶上色（按復原可還原）`);
+  toast(`已載入「${page.name}」— 以油漆桶上色（按復原可還原）`);
 }
+function loadColoringPage(i) { loadVectorPage(CLASSIC_TAB, i); }
 function loadEmojiPage(em) {
   pushUndo();
   ctx.clearRect(0,0,W,H);
@@ -999,9 +1485,11 @@ function loadEmojiPage(em) {
   toast(`線稿已載入 — 以油漆桶上色（按復原可還原）`);
 }
 
-/* ── 照片變線稿 ── */
-const PHOTO_W = 600, PHOTO_H = 400;
-let photoSrc = null; // 600x400 白底 contain
+/* ── 照片變線稿（區域分割：色塊邊界天生封閉，每一塊都保證可填色） ── */
+const PHOTO_W = 1200, PHOTO_H = 800; // 全畫布解析度，細節更完整
+let photoSrc = null;   // 1200×800 白底 contain 原圖
+let photoArt = null;   // 生成完成的 1200×800 線稿
+let photoPreset = "standard";
 const photoPreview = document.getElementById("photoPreview");
 function fitImageToCanvas(img, w, h) {
   const c = document.createElement("canvas");
@@ -1013,25 +1501,159 @@ function fitImageToCanvas(img, w, h) {
   x.drawImage(img, (w - dw) / 2, (h - dh) / 2, dw, dh);
   return c;
 }
-function photoParams() {
-  return {
-    threshold: 150 - (+document.getElementById("photoDetail").value),
-    dilate: +document.getElementById("photoThick").value,
-    blur: 2,
-  };
+// k-means 色彩量化：取樣迭代求中心，最後全圖指派標籤
+function kmeansLabels(r, g, b, n, K) {
+  const step = Math.max(1, Math.floor(n / 12000));
+  const samples = [];
+  for (let i = 0; i < n; i += step) samples.push(i);
+  samples.sort((a, c) => (r[a]*.299+g[a]*.587+b[a]*.114) - (r[c]*.299+g[c]*.587+b[c]*.114));
+  const cen = [];
+  for (let k = 0; k < K; k++) {
+    const idx = samples[Math.floor((k + 0.5) / K * samples.length)];
+    cen.push([r[idx], g[idx], b[idx]]);
+  }
+  for (let it = 0; it < 8; it++) {
+    const sum = Array.from({ length: K }, () => [0, 0, 0, 0]);
+    for (const i of samples) {
+      let bi = 0, bd = Infinity;
+      for (let k = 0; k < K; k++) {
+        const dr = r[i]-cen[k][0], dg = g[i]-cen[k][1], db = b[i]-cen[k][2];
+        const d = dr*dr + dg*dg + db*db;
+        if (d < bd) { bd = d; bi = k; }
+      }
+      const s = sum[bi]; s[0] += r[i]; s[1] += g[i]; s[2] += b[i]; s[3]++;
+    }
+    for (let k = 0; k < K; k++) if (sum[k][3]) cen[k] = [sum[k][0]/sum[k][3], sum[k][1]/sum[k][3], sum[k][2]/sum[k][3]];
+  }
+  const labels = new Uint8Array(n);
+  for (let i = 0; i < n; i++) {
+    let bi = 0, bd = Infinity;
+    for (let k = 0; k < K; k++) {
+      const dr = r[i]-cen[k][0], dg = g[i]-cen[k][1], db = b[i]-cen[k][2];
+      const d = dr*dr + dg*dg + db*db;
+      if (d < bd) { bd = d; bi = k; }
+    }
+    labels[i] = bi;
+  }
+  return { labels, centers: cen };
 }
-// 滑桿拖曳時 input 事件連發，用旗標+短計時器合併，最後一次一定會以最新滑桿值重算
-let photoPreviewQueued = false;
-function updatePhotoPreview() {
-  if (!photoSrc || photoPreviewQueued) return;
-  photoPreviewQueued = true;
+// 把過小的連通色塊併入最大鄰居，避免產生塗不到的碎屑
+function mergeSmallRegions(labels, w, h, minSize, K) {
+  const n = w * h;
+  const visited = new Uint8Array(n);
+  const stack = new Int32Array(n);
+  const pixels = new Int32Array(n);
+  const nb = new Int32Array(K);
+  for (let start = 0; start < n; start++) {
+    if (visited[start]) continue;
+    const lab = labels[start];
+    nb.fill(0);
+    let sp = 0, count = 0;
+    stack[sp++] = start; visited[start] = 1;
+    while (sp) {
+      const i = stack[--sp];
+      pixels[count++] = i;
+      const x = i % w;
+      if (x > 0)     { const j = i-1; if (labels[j] === lab) { if (!visited[j]) { visited[j] = 1; stack[sp++] = j; } } else nb[labels[j]]++; }
+      if (x < w-1)   { const j = i+1; if (labels[j] === lab) { if (!visited[j]) { visited[j] = 1; stack[sp++] = j; } } else nb[labels[j]]++; }
+      if (i >= w)    { const j = i-w; if (labels[j] === lab) { if (!visited[j]) { visited[j] = 1; stack[sp++] = j; } } else nb[labels[j]]++; }
+      if (i < n-w)   { const j = i+w; if (labels[j] === lab) { if (!visited[j]) { visited[j] = 1; stack[sp++] = j; } } else nb[labels[j]]++; }
+    }
+    if (count < minSize) {
+      let best = lab, bc = -1;
+      for (let k = 0; k < K; k++) if (nb[k] > bc) { bc = nb[k]; best = k; }
+      for (let j = 0; j < count; j++) labels[pixels[j]] = best;
+    }
+  }
+}
+// 照片 → 可著色線稿（自動，無需調整）
+function photoToColoring(srcCanvas, preset = "standard") {
+  const P = {
+    simple:   { K: 8,  blur: 4, minRegion: 700, sobel: 0,   simT: 40 },
+    standard: { K: 14, blur: 3, minRegion: 320, sobel: 170, simT: 30 },
+    fine:     { K: 20, blur: 2, minRegion: 140, sobel: 130, simT: 20 },
+  }[preset];
+  const w = srcCanvas.width, h = srcCanvas.height, n = w * h;
+  const src = srcCanvas.getContext("2d").getImageData(0, 0, w, h).data;
+  const r = new Float32Array(n), g = new Float32Array(n), b = new Float32Array(n);
+  for (let i = 0, p = 0; i < n; i++, p += 4) { r[i] = src[p]; g[i] = src[p+1]; b[i] = src[p+2]; }
+  // 平滑去噪（保留大形狀）
+  boxBlur(r, w, h, P.blur); boxBlur(g, w, h, P.blur); boxBlur(b, w, h, P.blur);
+  // 量化成 K 種色塊
+  const { labels, centers } = kmeansLabels(r, g, b, n, P.K);
+  // 相近色的標籤合併（漸層天空會量化成好幾條色帶，不合併會畫出等高線）
+  const remap = new Uint8Array(P.K);
+  for (let k = 0; k < P.K; k++) remap[k] = k;
+  const find = k => { while (remap[k] !== k) k = remap[k]; return k; };
+  const T2 = P.simT * P.simT;
+  for (let a = 0; a < P.K; a++) for (let c = a + 1; c < P.K; c++) {
+    const dr = centers[a][0]-centers[c][0], dg = centers[a][1]-centers[c][1], db = centers[a][2]-centers[c][2];
+    if (dr*dr + dg*dg + db*db < T2) remap[find(c)] = find(a);
+  }
+  for (let i = 0; i < n; i++) labels[i] = find(labels[i]);
+  // 清除塗不到的碎屑區域
+  mergeSmallRegions(labels, w, h, P.minRegion, P.K);
+  // 色塊邊界（封閉輪廓）
+  let edge = new Uint8Array(n);
+  for (let y = 0; y < h - 1; y++) {
+    let i = y * w;
+    for (let x = 0; x < w - 1; x++, i++) {
+      if (labels[i] !== labels[i+1] || labels[i] !== labels[i+w]) edge[i] = 1;
+    }
+  }
+  // 疊加高門檻細節線（頭髮、五官等鮮明特徵；開放線條不影響填色封閉性）
+  if (P.sobel) {
+    const det = new Uint8Array(n);
+    const gray = new Float32Array(n);
+    for (let i = 0; i < n; i++) gray[i] = r[i]*.299 + g[i]*.587 + b[i]*.114;
+    const S2 = P.sobel * P.sobel;
+    for (let y = 1; y < h-1; y++) for (let x = 1; x < w-1; x++) {
+      const i = y*w + x;
+      const gx = -gray[i-w-1] - 2*gray[i-1] - gray[i+w-1] + gray[i-w+1] + 2*gray[i+1] + gray[i+w+1];
+      const gy = -gray[i-w-1] - 2*gray[i-w] - gray[i-w+1] + gray[i+w-1] + 2*gray[i+w] + gray[i+w+1];
+      if (gx*gx + gy*gy > S2) det[i] = 1;
+    }
+    // 高密度區塊 = 紋理雜訊（草地、毛毯），整塊清除，否則會把區域切碎到塗不了
+    const BS = 16;
+    for (let by = 0; by < h; by += BS) for (let bx = 0; bx < w; bx += BS) {
+      const ye = Math.min(by + BS, h), xe = Math.min(bx + BS, w);
+      let cnt = 0, tot = 0;
+      for (let y = by; y < ye; y++) for (let x = bx; x < xe; x++) { tot++; if (det[y*w+x]) cnt++; }
+      if (cnt > tot * 0.28) for (let y = by; y < ye; y++) for (let x = bx; x < xe; x++) det[y*w+x] = 0;
+    }
+    for (let i = 0; i < n; i++) if (det[i]) edge[i] = 1;
+  }
+  edge = dilateMask(edge, w, h, 1);
+  const out = document.createElement("canvas");
+  out.width = w; out.height = h;
+  const octx = out.getContext("2d");
+  const im = octx.createImageData(w, h);
+  const D = im.data;
+  for (let i = 0, p = 0; i < n; i++, p += 4) {
+    const v = edge[i] ? 34 : 255;
+    D[p] = D[p+1] = D[p+2] = v; D[p+3] = 255;
+  }
+  octx.putImageData(im, 0, 0);
+  return out;
+}
+function generatePhotoArt() {
+  if (!photoSrc) return;
+  toast("線稿生成中…");
   setTimeout(() => {
-    photoPreviewQueued = false;
-    if (!photoSrc) return;
-    const art = toLineArt(photoSrc, "photo", photoParams());
-    photoPreview.getContext("2d").drawImage(art, 0, 0);
-  }, 16);
+    photoArt = photoToColoring(photoSrc, photoPreset);
+    const pv = photoPreview.getContext("2d");
+    pv.clearRect(0, 0, 600, 400);
+    pv.drawImage(photoArt, 0, 0, 600, 400);
+    toast("線稿完成 — 按「放到畫布」開始上色");
+  }, 30);
 }
+document.querySelectorAll("#photoEditor .preset").forEach(btn =>
+  btn.addEventListener("click", () => {
+    photoPreset = btn.dataset.preset;
+    document.querySelectorAll("#photoEditor .preset").forEach(x =>
+      x.classList.toggle("active", x === btn));
+    generatePhotoArt();
+  }));
 document.getElementById("photoPick").addEventListener("click", () =>
   document.getElementById("photoInput").click());
 document.getElementById("photoInput").addEventListener("change", e => {
@@ -1044,23 +1666,17 @@ document.getElementById("photoInput").addEventListener("change", e => {
     if (!img.naturalWidth || !img.naturalHeight) { toast("這張圖片打不開，換一張試試"); return; }
     photoSrc = fitImageToCanvas(img, PHOTO_W, PHOTO_H);
     document.getElementById("photoEditor").style.display = "block";
-    updatePhotoPreview();
+    generatePhotoArt();
   };
   img.onerror = () => { URL.revokeObjectURL(url); toast("這張圖片打不開，換一張試試"); };
   img.src = url;
   e.target.value = ""; // 同一張可重選
 });
-document.getElementById("photoDetail").addEventListener("input", updatePhotoPreview);
-document.getElementById("photoThick").addEventListener("input", updatePhotoPreview);
 document.getElementById("photoApply").addEventListener("click", () => {
-  if (!photoSrc) return;
+  if (!photoArt) return;
   pushUndo();
-  const art = toLineArt(photoSrc, "photo", photoParams());
-  ctx.save();
-  ctx.imageSmoothingEnabled = false; // 放大 2 倍保持線條銳利，填色才不會漏
   ctx.clearRect(0,0,W,H);
-  ctx.drawImage(art, 0, 0, W, H);
-  ctx.restore();
+  ctx.drawImage(photoArt, 0, 0); // 已是 1200×800 二值線稿，直接放上
   closeDrawer("coloringDrawer");
   setTool("bucket");
   toast("照片線稿已載入（按復原可還原）");
@@ -1238,7 +1854,7 @@ refreshHistoryBtns();
 fitCanvas();
 
 // 匯出給自動化測試使用
-window.__board = { state, floodFill, placeStamp, loadColoringPage, loadEmojiPage, emojiColoringPage, toLineArt, renderColoringTab, pushUndo, doUndo, doRedo, canvas, ctx, PAGES, STAMP_SETS, EMOJI_PAGE_SETS, TOTAL_PAGES };
+window.__board = { state, floodFill, placeStamp, loadColoringPage, loadVectorPage, loadEmojiPage, emojiColoringPage, toLineArt, photoToColoring, renderColoringTab, pushUndo, doUndo, doRedo, canvas, ctx, PAGES, VECTOR_SETS, STAMP_SETS, EMOJI_PAGE_SETS, TOTAL_PAGES };
 </script>
 </body>
 </html>

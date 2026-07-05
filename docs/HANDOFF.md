@@ -39,12 +39,13 @@
 | 工具列 | `svgIcon()`/`ICONS`（全部圖示的 SVG path）、`TOOLS`（11 工具）、`setTool()`、`mirrorBtn`、`zoomBtn`（`ZOOMS=[1,1.6,2.4]`） |
 | 復原/重做 | `snapshotCanvas()`（離屏 canvas 快照）、`pushUndo(snap?)`、同步 `restore()`、`MAX_UNDO=15` |
 | 筆刷 | `strokeSegment()` → `drawBrushSegment()`（依 `state.tool` switch；對稱模式畫兩次） |
-| 油漆桶 | `floodFill()` 掃描線填色，容差 60²，含**線條吸附**（點到深色線往外螺旋找半徑 8 內最近非線像素） |
+| 油漆桶 | `floodFill()` 掃描線填色，容差 60²，含**線條吸附**（點到深色線往外找半徑 10 內最近非線像素，再沿同方向深入 2px 越過反鋸齒漸層帶） |
 | 印章 | `placeStamp()`、`STAMP_SETS`（196 emoji、6 分類） |
 | 線稿轉換引擎 | `boxBlur()`、`dilateMask()`、`toLineArt(src, "flat"|"photo", opts)`、`renderEmojiCanvas()`、`emojiColoringPage()` |
-| 著色圖庫 | `EMOJI_PAGE_SETS`（7 分類 459 張）+ 執行期 ZWJ/去重過濾、`PAGES`（10 張手繪場景，canvas 程式繪製）、`TOTAL_PAGES=469` |
-| 著色分頁 | `renderColoringTab()`、縮圖泵 `queueThumb()`/`thumbChannel`（MessageChannel）、`thumbCache` |
-| 照片變線稿 | `photoSrc`（600×400 白底 contain）→ `toLineArt("photo")` → 套用時 ×2 nearest-neighbor 放大到 1200×800 |
+| 手繪線稿 | `P` 繪圖工具（circle/ellipse/poly/seg/dot/arc/curve/qcurve/**blob 平滑閉合曲線**）+ 共用元件（drawHeart/star5/snowflake/musicNote/devilHead）；`VECTOR_SETS` 五系列各 10 張：經典場景 `PAGES`、甜酷小惡魔 `PAGES_DEVIL`、口袋小怪獸 `PAGES_MON`、冰雪王國 `PAGES_ICE`、動物城市 `PAGES_CITY` |
+| 著色圖庫 | `EMOJI_PAGE_SETS`（6 分類 403 張）+ 執行期 ZWJ/去重過濾、`TOTAL_PAGES=453` |
+| 著色分頁 | `renderColoringTab()`（向量分頁 → emoji 分頁 → 照片分頁）、縮圖泵 `queueThumb()`/`thumbChannel`（MessageChannel）、`thumbCache`、`loadVectorPage(setName,i)` |
+| 照片變線稿 | **全自動區域分割** `photoToColoring(src, preset)`：`kmeansLabels()` 色彩量化 → 相近色標籤合併（防漸層等高線）→ `mergeSmallRegions()` 碎屑併入鄰居 → 封閉色塊邊界 + 高門檻 Sobel 細節線（16×16 高密度區塊自動抑制，防紋理切碎）；1200×800 全解析度；三 preset：simple/standard/fine |
 | 畫布事件 | pointerdown/move/up：hand=平移 stage、bucket、stamp、筆刷；`endStroke()` |
 | 存檔/作品集 | `compositeCanvas()`（合成畫紙底色）、localStorage 鍵 `freeboard.gallery.v1`（JPEG 0.72，空間不足淘汰最舊） |
 | 版面 | `fitCanvas()`（含 0 尺寸守衛 + zoomFactor）+ `ResizeObserver` |
@@ -60,7 +61,9 @@
 6. **縮圖預熱只在第一次打開著色本時啟動**（在 `openDrawer` 內），不要搬回頁面啟動時（會在使用者剛開始畫圖時佔滿主執行緒約 9 秒 + 常駐 40MB）。
 7. **分類鍵含 emoji 前綴是資料鍵**（如 `"🐾 動物王國"`），顯示時用 `tabLabel()` 去前綴。改鍵名要同步改 `CLASSIC_TAB`/`PHOTO_TAB`/`currentColorTab` 與所有引用。
 8. **彩色 emoji `fillText` 光柵化很貴**（約 15–20ms/字），且成本遞延到第一次 `getImageData` 才爆出來 — profiling 時別誤判成像素迴圈慢。
-9. 照片線稿在 600×400 處理後 ×2 無平滑放大 — 是刻意的（預覽即所得 + 粗線利於填色），不是 bug。
+9. **照片線稿走「區域分割」不是邊緣偵測**：邊緣偵測（Sobel）產生開放輪廓，缺口會讓填色漏成一片 — 這是曾經上線又重寫的教訓。色塊分割的邊界天生封閉。改 `photoToColoring` 時必須保住三件事：(a) 相近色標籤合併（否則漸層變等高線）、(b) 碎屑區域清理（否則產生塗不到的小格）、(c) Sobel 細節的高密度區塊抑制（否則草地/毛髮紋理把區域切碎）。
+10. **手繪線稿的閉合形狀用 `P.blob`**（起終點保證相接），`P.curve` 終點停在中點、不閉合，畫封閉形狀會留缺口漏色。
+11. **公開網站不放官方版權角色**（三麗鷗/任天堂/迪士尼等）：主題系列一律原創致敬風格；使用者要官方角色時，指引他用「照片變線稿」自行在家轉換（個人使用）。
 
 ## 4. 測試方式
 
@@ -103,11 +106,12 @@ ev("pointerdown",100,700); ev("pointermove",200,720); ev("pointerup",200,720);
 
 ## 7. 已知限制與 roadmap 候選
 
-- 照片線稿細節受 600×400 處理解析度限制（換取預覽一致與粗線）。
-- 手繪經典線稿在 `PAGES` 陣列（每張一個 `draw(c)` 函式，座標基準 1200×800，線寬 7）；新增場景照同格式加函式即可。
+- 照片線稿生成約 1–2 秒（k-means 全解析度），期間主執行緒忙碌 — 已有「生成中」toast，若要更順可改 Web Worker。
+- 手繪線稿在 `VECTOR_SETS` 的五個陣列（每張一個 `draw(c)` 函式，座標基準 1200×800，線寬 7，閉合形狀用 `P.blob`）；新增系列＝加一個陣列＋掛進 `VECTOR_SETS` 即自動出現分頁。
 - 候選功能：圖層系統、筆刷壓感（`PointerEvent.pressure` 觸控筆可用）、更多手繪場景、選取/移動局部、匯出 SVG、PWA 離線快取、音效開關。
 
 ## 8. 歷史脈絡（為什麼長這樣）
 
-- 2026-07-04 首版：可愛風、10 張手繪著色圖。同日擴充：線稿轉換引擎 + 469 張著色圖 + 照片變線稿；多代理審查修正 10 項問題（油漆桶吸附、快照式復原、預熱時機、觸控目標、手機放大等）。
+- 2026-07-04 首版：可愛風、10 張手繪著色圖。同日擴充：線稿轉換引擎 + 469 張著色圖 + 照片變線稿（v1：Sobel 邊緣偵測）；多代理審查修正 10 項問題（油漆桶吸附、快照式復原、預熱時機、觸控目標、手機放大等）。
 - 2026-07-05 質感改版：整體改為深色高級質感（使用者不要可愛風），emoji 按鈕全面換成 SVG 線條圖示，文案去語氣詞。**功能與引擎不變，只動皮膚與文案。**
+- 2026-07-05（二）：照片變線稿重寫為**全自動區域分割**（v1 的開放輪廓會漏色、調滑桿也救不回，故整個換掉並移除滑桿）；新增四個原創主題系列各 10 張（甜酷小惡魔/口袋小怪獸/冰雪王國/動物城市 — 使用者原本要求庫洛米/寶可夢/冰雪奇緣/動物方城市，因版權改原創致敬）；移除表情臉譜 emoji 分類（使用者要求）；油漆桶吸附修正反鋸齒漸層帶問題。
