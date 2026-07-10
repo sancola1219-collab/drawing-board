@@ -13,6 +13,7 @@
 3. 線稿轉換（`toLineArt`/`photoToColoring`）必須輸出二值圖（線 34、底 255），油漆桶填色依賴這點；照片走「區域分割」不是邊緣偵測（開放輪廓會漏色）。手繪閉合形狀用 `P.blob`。
 3b. **公開網站不放官方版權角色**（三麗鷗/任天堂/迪士尼…）：主題著色系列一律原創致敬風格；官方角色引導使用者用「照片變線稿」自行轉換。
 4. 復原系統用離屏 canvas 快照 + 同步 restore（`snapshotCanvas`/`pushUndo`）；勿改回 toDataURL 或非同步 Image 還原。
+4b. 畫布是雙層：`#refBoard`（素描參考層，在下）+ `#board`（作畫層，背景透明，在上）；畫紙底色設在 `#canvasWrap`。素描參考層不進復原、不被 floodFill 讀取。
 5. 油漆桶：先快照 → floodFill → 成功才 pushUndo；失敗給 toast。
 6. `fitCanvas` 的 0 尺寸守衛與 `ResizeObserver` 不可移除（隱藏視窗載入時容器尺寸可能是 0）。
 7. 縮圖生成只能用 MessageChannel 泵（隱藏分頁 setTimeout 會被節流）；預熱只在第一次開著色本時啟動。

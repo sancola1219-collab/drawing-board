@@ -82,8 +82,18 @@ main{flex:1;display:flex;min-height:0}
 #stage{flex:1;display:flex;align-items:center;justify-content:center;min-width:0;padding:4px;overflow:auto;
   background:radial-gradient(ellipse at 50% 40%,#1a1a20 0%,var(--bg0) 75%)}
 #stage.zoomed{align-items:flex-start;justify-content:flex-start}
-#canvasWrap{position:relative;box-shadow:0 20px 60px rgba(0,0,0,.6),0 0 0 1px var(--line2);border-radius:4px;overflow:hidden}
-#board{display:block;background:#ffffff;touch-action:none;cursor:crosshair}
+#canvasWrap{position:relative;background:#ffffff;box-shadow:0 20px 60px rgba(0,0,0,.6),0 0 0 1px var(--line2);border-radius:4px;overflow:hidden}
+#refBoard{position:absolute;inset:0;width:100%;height:100%;z-index:1;pointer-events:none;display:none}
+#refBoard.on{display:block}
+#board{display:block;position:relative;z-index:2;background:transparent;touch-action:none;cursor:crosshair}
+/* 素描參考控制列 */
+#sketchCtrl{position:fixed;top:64px;left:50%;transform:translateX(-50%);z-index:40;display:none;align-items:center;gap:12px;
+  background:var(--bg2);border:1px solid rgba(200,164,104,.4);border-radius:999px;padding:8px 16px;box-shadow:var(--shadow)}
+#sketchCtrl.show{display:flex}
+#sketchCtrl .sk-lbl{font-size:12px;font-weight:600;letter-spacing:.08em;color:var(--gold);white-space:nowrap}
+#sketchCtrl input[type=range]{width:120px}
+#sketchCtrl button{border:1px solid var(--line);background:transparent;color:var(--txt2);border-radius:8px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap;transition:color .15s,border-color .15s}
+#sketchCtrl button:hover{color:var(--txt);border-color:var(--line2)}
 /* ── 底部調色盤 ── */
 #bottombar{
   display:flex;align-items:center;gap:14px;padding:10px 16px;flex-wrap:wrap;
@@ -185,6 +195,8 @@ input[type=range]::-webkit-slider-thumb{appearance:none;-webkit-appearance:none;
   #sizeSlider{width:80px}
   #sizeDot{width:32px;height:32px}
   #paperBox .paper{width:18px;height:18px}
+  #sketchCtrl{top:auto;bottom:150px;padding:6px 12px;gap:8px}
+  #sketchCtrl input[type=range]{width:84px}
 }
 </style>
 </head>
@@ -196,6 +208,7 @@ input[type=range]::-webkit-slider-thumb{appearance:none;-webkit-appearance:none;
   <button class="hbtn primary" id="btnColoring"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6c-2-1.4-4.6-2-8-2v14c3.4 0 6 .6 8 2 2-1.4 4.6-2 8-2V4c-3.4 0-6 .6-8 2z"/><path d="M12 6v14"/></svg><span class="btxt">著色本</span></button>
   <button class="hbtn primary" id="btnGallery"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M4 17l5-5 4 4 3-3 4 4"/></svg><span class="btxt">作品集</span></button>
   <button class="hbtn primary" id="btnShuffle" title="隨機換一張著色構圖"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="3"/><circle cx="9" cy="9" r="1.3"/><circle cx="15" cy="9" r="1.3"/><circle cx="9" cy="15" r="1.3"/><circle cx="15" cy="15" r="1.3"/></svg><span class="btxt">換構圖</span></button>
+  <button class="hbtn primary" id="btnSketch" title="卡通人物素描臨摹"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20l1.2-4.2L15 6l3 3-9.8 9.8L4 20z"/><path d="M13 8l3 3"/><path d="M15 4l2-2 3 3-2 2"/></svg><span class="btxt">素描</span></button>
   <span class="spacer"></span>
   <button class="hbtn" id="btnUndo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 6 6v4"/></svg><span class="btxt">復原</span></button>
   <button class="hbtn" id="btnRedo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 14l5-5-5-5"/><path d="M20 9H10a6 6 0 0 0-6 6v4"/></svg><span class="btxt">重做</span></button>
@@ -206,7 +219,7 @@ input[type=range]::-webkit-slider-thumb{appearance:none;-webkit-appearance:none;
 <main>
   <div id="toolbar"></div>
   <div id="stage">
-    <div id="canvasWrap"><canvas id="board" width="1200" height="800"></canvas></div>
+    <div id="canvasWrap"><canvas id="refBoard"></canvas><canvas id="board" width="1200" height="800"></canvas></div>
   </div>
 </main>
 
@@ -262,6 +275,26 @@ input[type=range]::-webkit-slider-thumb{appearance:none;-webkit-appearance:none;
     <div class="phead"><h2>作品集</h2><button class="hbtn primary" id="btnSaveToGallery">＋ 收藏目前畫作</button><button class="closeBtn" data-close="galleryDrawer">✕</button></div>
     <div class="pbody"><div id="galleryGrid"></div><div id="galleryEmpty" style="display:none">尚無收藏的作品 — 完成畫作後按「收藏目前畫作」。</div></div>
   </div>
+</div>
+
+<!-- 素描臨摹抽屜 -->
+<div class="drawer" id="sketchDrawer">
+  <div class="panel">
+    <div class="phead"><h2>素描臨摹 — 選一個卡通角色，照著淡淡的參考線描繪</h2><button class="closeBtn" data-close="sketchDrawer">✕</button></div>
+    <div id="sketchTabs"></div>
+    <div class="pbody">
+      <div class="photoHint" style="margin-bottom:14px">選一個角色後，畫布會浮現一層<b>淡淡的參考線</b>，用鉛筆照著描就能學會畫卡通人物。上方控制列可調整參考線濃淡、隱藏或移除。</div>
+      <div id="sketchGrid"></div>
+    </div>
+  </div>
+</div>
+
+<!-- 素描參考控制列 -->
+<div id="sketchCtrl">
+  <span class="sk-lbl">參考線</span>
+  <input type="range" id="refOpacity" min="10" max="90" value="50" title="參考線濃淡">
+  <button id="refToggle">隱藏</button>
+  <button id="refRemove">移除</button>
 </div>
 
 <div id="toast"></div>
@@ -412,7 +445,7 @@ PAPERS.forEach(p => {
   b.className = "paper"; b.style.background = p; b.dataset.paper = p;
   b.addEventListener("click", () => {
     state.paper = p;
-    canvas.style.background = p;
+    document.getElementById("canvasWrap").style.background = p;
     document.querySelectorAll(".paper").forEach(x =>
       x.classList.toggle("active", x.dataset.paper === p));
   });
@@ -1749,6 +1782,15 @@ let currentColorTab = CLASSIC_TAB;
 let coloringBuilt = false;
 const pageGrid = document.getElementById("pageGrid");
 const thumbCache = new Map();
+// thumbCache 存的是離屏主 canvas（永不進 DOM）；每張卡片放一份複本。
+// 直接 appendChild 快取節點會被「搬走」（DOM 節點只能有一個父層），
+// 著色本與素描抽屜共用同一組 key，會互相偷走縮圖變空白。
+function thumbNode(src) {
+  const c = document.createElement("canvas");
+  c.width = src.width; c.height = src.height;
+  c.getContext("2d").drawImage(src, 0, 0); // canvas 不能 cloneNode（點陣不會複製），要 drawImage
+  return c;
+}
 const colorTabsEl = document.getElementById("colorTabs");
 COLOR_TABS.forEach(name => {
   const b = document.createElement("button");
@@ -1775,11 +1817,11 @@ function renderColoringTab() {
         th.width = 300; th.height = 200;
         const tc = th.getContext("2d");
         tc.fillStyle = "#fff"; tc.fillRect(0,0,300,200);
-        tc.scale(300 / W, 200 / H);
+        tc.scale(300 / 1200, 200 / 800); // 手繪線稿座標基準固定 1200×800
         p.draw(tc);
         thumbCache.set(ck, th);
       }
-      card.appendChild(th);
+      card.appendChild(thumbNode(th));
       const nm = document.createElement("div");
       nm.className = "pname"; nm.textContent = p.name;
       card.appendChild(nm);
@@ -1793,13 +1835,13 @@ function renderColoringTab() {
     card.className = "pageCard"; card.title = em;
     const cached = thumbCache.get(em);
     if (cached) {
-      card.appendChild(cached);
+      card.appendChild(thumbNode(cached));
     } else {
       // 先放灰階 emoji 佔位，縮圖在背景分批生成後換上
       const ph = document.createElement("div");
       ph.className = "emThumb"; ph.textContent = em;
       card.appendChild(ph);
-      queueThumb(em, () => { if (card.isConnected) card.replaceChild(thumbCache.get(em), ph); });
+      queueThumb(em, () => { if (card.isConnected) card.replaceChild(thumbNode(thumbCache.get(em)), ph); });
     }
     card.addEventListener("click", () => loadEmojiPage(em));
     pageGrid.appendChild(card);
@@ -1833,6 +1875,7 @@ function queueThumb(em, apply) {
 function loadVectorPage(setName, i) {
   const page = VECTOR_SETS[setName][i];
   pushUndo();
+  clearReference();
   // 手繪線稿座標基準固定 1200×800，先畫到離屏再等比放上畫布（直式畫布也適用）
   const off = document.createElement("canvas");
   off.width = 1200; off.height = 800;
@@ -1922,12 +1965,145 @@ function composeEmojiScene(em) {
 }
 function loadEmojiPage(em) {
   pushUndo();
+  clearReference();
   lastEmojiSubject = em;
   drawContainWhite(composeEmojiScene(em));
   closeDrawer("coloringDrawer");
   setTool("bucket");
   toast("線稿已載入 — 按「換構圖」可換不同畫面（按復原可還原）");
 }
+
+/* ══════════════ 素描臨摹（卡通人物參考層） ══════════════ */
+const refCanvas = document.getElementById("refBoard");
+refCanvas.width = W; refCanvas.height = H;
+const refCtx = refCanvas.getContext("2d");
+let refActive = false, refVisible = true, refOpacity = 0.5;
+
+// 線稿（線 34、底 255）轉成「淡灰線 + 透明底」的參考層
+function makeFaint(src) {
+  const w = src.width, h = src.height;
+  const o = document.createElement("canvas");
+  o.width = w; o.height = h;
+  const octx = o.getContext("2d");
+  const im = src.getContext("2d").getImageData(0, 0, w, h), d = im.data;
+  for (let i = 0; i < d.length; i += 4) {
+    if (d[i] < 100) { d[i] = 88; d[i+1] = 94; d[i+2] = 112; d[i+3] = 255; }
+    else d[i+3] = 0;
+  }
+  octx.putImageData(im, 0, 0);
+  return o;
+}
+function applyRefStyle() {
+  refCanvas.classList.toggle("on", refActive && refVisible);
+  refCanvas.style.opacity = refOpacity;
+}
+function setReference(lineArt) {
+  const faint = makeFaint(lineArt);
+  refCtx.clearRect(0, 0, W, H);
+  const s = Math.min(W / faint.width, H / faint.height); // 等比置中（直式畫布也適用）
+  refCtx.drawImage(faint, (W - faint.width*s)/2, (H - faint.height*s)/2, faint.width*s, faint.height*s);
+  refActive = true; refVisible = true;
+  applyRefStyle();
+  document.getElementById("sketchCtrl").classList.add("show");
+  document.getElementById("refToggle").textContent = "隱藏";
+}
+function clearReference() {
+  if (!refActive) return;
+  refActive = false;
+  refCtx.clearRect(0, 0, W, H);
+  applyRefStyle();
+  document.getElementById("sketchCtrl").classList.remove("show");
+}
+document.getElementById("refOpacity").addEventListener("input", e => {
+  refOpacity = e.target.value / 100; applyRefStyle();
+});
+document.getElementById("refToggle").addEventListener("click", () => {
+  refVisible = !refVisible; applyRefStyle();
+  document.getElementById("refToggle").textContent = refVisible ? "隱藏" : "顯示";
+});
+document.getElementById("refRemove").addEventListener("click", () => {
+  clearReference(); toast("已移除參考圖");
+});
+
+// 素描題材：卡通人物與角色（原創手繪系列 + 通用 emoji 角色，載入為淡參考線）
+const SKETCH_SETS = {
+  "🧑 人物角色": { type: "emoji", key: "🧑 人物角色" },
+  "🐾 動物夥伴": { type: "emoji", key: "🐾 動物王國" },
+  "🖤 甜酷小惡魔": { type: "vector", key: "🖤 甜酷小惡魔" },
+  "👾 口袋小怪獸": { type: "vector", key: "👾 口袋小怪獸" },
+  "🏙️ 動物城市": { type: "vector", key: "🏙️ 動物城市" },
+};
+let currentSketchTab = Object.keys(SKETCH_SETS)[0];
+let sketchBuilt = false;
+const sketchTabsEl = document.getElementById("sketchTabs");
+const sketchGrid = document.getElementById("sketchGrid");
+Object.keys(SKETCH_SETS).forEach(name => {
+  const b = document.createElement("button");
+  b.className = "stab"; b.textContent = tabLabel(name); b.dataset.tab = name;
+  b.addEventListener("click", () => { currentSketchTab = name; renderSketchTab(); });
+  sketchTabsEl.appendChild(b);
+});
+function vectorLineArt(setName, i) {
+  const off = document.createElement("canvas");
+  off.width = 1200; off.height = 800;
+  const oc = off.getContext("2d");
+  oc.fillStyle = "#ffffff"; oc.fillRect(0, 0, 1200, 800);
+  VECTOR_SETS[setName][i].draw(oc);
+  return off;
+}
+function renderSketchTab() {
+  document.querySelectorAll("#sketchTabs .stab").forEach(t =>
+    t.classList.toggle("active", t.dataset.tab === currentSketchTab));
+  sketchGrid.innerHTML = "";
+  const conf = SKETCH_SETS[currentSketchTab];
+  if (conf.type === "vector") {
+    VECTOR_SETS[conf.key].forEach((p, i) => {
+      const card = document.createElement("button");
+      card.className = "pageCard";
+      const ck = `vec:${conf.key}:${i}`;
+      let th = thumbCache.get(ck);
+      if (!th) {
+        th = document.createElement("canvas"); th.width = 300; th.height = 200;
+        const tc = th.getContext("2d");
+        tc.fillStyle = "#fff"; tc.fillRect(0,0,300,200);
+        tc.scale(300 / 1200, 200 / 800);
+        p.draw(tc);
+        thumbCache.set(ck, th);
+      }
+      card.appendChild(thumbNode(th));
+      const nm = document.createElement("div");
+      nm.className = "pname"; nm.textContent = p.name;
+      card.appendChild(nm);
+      card.addEventListener("click", () => loadSketchVector(conf.key, i));
+      sketchGrid.appendChild(card);
+    });
+    return;
+  }
+  EMOJI_PAGE_SETS[conf.key].forEach(em => {
+    const card = document.createElement("button");
+    card.className = "pageCard"; card.title = em;
+    const cached = thumbCache.get(em);
+    if (cached) card.appendChild(thumbNode(cached));
+    else {
+      const ph = document.createElement("div");
+      ph.className = "emThumb"; ph.textContent = em;
+      card.appendChild(ph);
+      queueThumb(em, () => { if (card.isConnected) card.replaceChild(thumbNode(thumbCache.get(em)), ph); });
+    }
+    card.addEventListener("click", () => loadSketchEmoji(em));
+    sketchGrid.appendChild(card);
+  });
+}
+function startSketch(lineArt) {
+  pushUndo();
+  ctx.clearRect(0, 0, W, H);           // 清空畫布，讓下層參考線透出
+  setReference(lineArt);
+  closeDrawer("sketchDrawer");
+  setTool("pen");
+  toast("參考線已浮現 — 用鉛筆照著描（上方可調濃淡）");
+}
+function loadSketchVector(setName, i) { startSketch(vectorLineArt(setName, i)); }
+function loadSketchEmoji(em) { startSketch(emojiColoringPage(em, 1200, 800, 1)); }
 
 /* ── 照片變線稿（區域分割：色塊邊界天生封閉，每一塊都保證可填色） ── */
 const PHOTO_W = W, PHOTO_H = H; // 跟畫布同解析度（直式畫布配直式照片剛剛好）
@@ -2120,6 +2296,7 @@ document.getElementById("photoInput").addEventListener("change", e => {
 document.getElementById("photoApply").addEventListener("click", () => {
   if (!photoArt) return;
   pushUndo();
+  clearReference();
   ctx.clearRect(0,0,W,H);
   ctx.drawImage(photoArt, 0, 0); // 已是 1200×800 二值線稿，直接放上
   closeDrawer("coloringDrawer");
@@ -2184,6 +2361,9 @@ function compositeCanvas(type = "image/png", q) {
   tmp.width = W; tmp.height = H;
   const t = tmp.getContext("2d");
   t.fillStyle = state.paper; t.fillRect(0,0,W,H);
+  if (refActive && refVisible && refOpacity > 0) { // 素描參考線一起匯出（所見即所得）
+    t.globalAlpha = refOpacity; t.drawImage(refCanvas, 0, 0); t.globalAlpha = 1;
+  }
   t.drawImage(canvas, 0, 0);
   return tmp.toDataURL(type, q);
 }
@@ -2222,6 +2402,7 @@ function renderGallery() {
     img.src = item.img; img.title = "點一下載入到畫布";
     img.addEventListener("click", () => {
       pushUndo();
+      clearReference(); // 載入作品即退出素描模式（清掉浮動控制列與參考層）
       const im = new Image();
       im.onload = () => drawContainWhite(im); // 舊作品可能是不同方向的畫布，等比置中不變形
       im.src = item.img;
@@ -2256,10 +2437,12 @@ function openDrawer(id) {
     // 第一次打開著色本才開始預熱全部縮圖（畫面上的卡片會插隊優先）
     Object.keys(EMOJI_PAGE_SETS).forEach(k => EMOJI_PAGE_SETS[k].forEach(em => queueThumb(em)));
   }
+  if (id === "sketchDrawer" && !sketchBuilt) { sketchBuilt = true; renderSketchTab(); }
 }
 function closeDrawer(id) { document.getElementById(id).classList.remove("open"); }
 document.getElementById("btnStamps").addEventListener("click", () => openDrawer("stampDrawer"));
 document.getElementById("btnColoring").addEventListener("click", () => openDrawer("coloringDrawer"));
+document.getElementById("btnSketch").addEventListener("click", () => openDrawer("sketchDrawer"));
 document.getElementById("btnGallery").addEventListener("click", () => openDrawer("galleryDrawer"));
 // 換構圖：目前有主角就換同主角的新構圖，否則隨機挑一個主角
 document.getElementById("btnShuffle").addEventListener("click", () => {
@@ -2309,7 +2492,7 @@ refreshHistoryBtns();
 fitCanvas();
 
 // 匯出給自動化測試使用
-window.__board = { state, floodFill, placeStamp, loadColoringPage, loadVectorPage, loadEmojiPage, composeEmojiScene, emojiColoringPage, toLineArt, photoToColoring, renderColoringTab, pushUndo, doUndo, doRedo, canvas, ctx, PAGES, VECTOR_SETS, STAMP_SETS, EMOJI_PAGE_SETS, TOTAL_PAGES };
+window.__board = { state, floodFill, placeStamp, loadColoringPage, loadVectorPage, loadEmojiPage, composeEmojiScene, emojiColoringPage, toLineArt, photoToColoring, renderColoringTab, loadSketchVector, loadSketchEmoji, clearReference, renderSketchTab, refCanvas, get refActive(){return refActive}, get refVisible(){return refVisible}, SKETCH_SETS, pushUndo, doUndo, doRedo, canvas, ctx, PAGES, VECTOR_SETS, STAMP_SETS, EMOJI_PAGE_SETS, TOTAL_PAGES };
 </script>
 </body>
 </html>

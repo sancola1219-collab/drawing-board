@@ -30,9 +30,11 @@
 
 **CSS**：token → header → #toolbar/.tool → #stage/#board → #bottombar/調色盤 → .drawer/.panel → .stab 頁籤 → #stampGrid → #pageGrid/#photoPanel → 作品集 → #toast → 手機 media query
 
-**HTML**：`<header>`（7 顆按鈕：圖章/著色本/作品集/復原/重做/清除/存檔）→ `<main>`（`#toolbar` 左欄、`#stage` > `#canvasWrap` > `#board`）→ `#bottombar`（粗細、26 色調色盤、自訂色、畫紙）→ 三個 `.drawer`（`stampDrawer` / `coloringDrawer` / `galleryDrawer`）→ `#toast`
+**HTML**：`<header>`（8 顆按鈕：圖章/著色本/**素描**/作品集/換構圖/復原/重做/清除/存檔）→ `<main>`（`#toolbar` 左欄、`#stage` > `#canvasWrap` > `#refBoard`＋`#board`）→ `#bottombar`（粗細、26 色調色盤、自訂色、畫紙）→ 四個 `.drawer`（`stampDrawer` / `coloringDrawer` / `sketchDrawer` / `galleryDrawer`）＋ `#sketchCtrl` 浮動控制列 → `#toast`
 
-**畫布解析度（2026-07-08 起）**：載入時依螢幕方向決定 — 橫式 `1200×800`、直式（手機）`800×1200`（`PORTRAIT` 常數）。手繪線稿座標基準固定 1200×800，`loadVectorPage` 先畫到離屏再用 `drawContainWhite()` 等比置中放上畫布；emoji 線稿與照片直接用畫布尺寸原生生成。`fitCanvas` 無縮放上限（畫布佔滿 stage）。
+**畫布圖層（2026-07-09 起）**：`#canvasWrap` 內兩張同尺寸 canvas 疊放 — `#refBoard`（z1，素描參考層，pointer-events:none）在下、`#board`（z2，使用者作畫，背景透明）在上；**畫紙底色改設在 `#canvasWrap` 背景**（非 `#board`），因此 board 透明才能讓下層參考線透出。改動任何一項都要一起考慮這個疊層關係。
+
+**畫布解析度（2026-07-08 起）**：載入時依螢幕方向決定 — 橫式 `1200×800`、直式（手機）`800×1200`（`PORTRAIT` 常數）。手繪線稿座標基準固定 1200×800，`loadVectorPage`/素描參考先畫到離屏 1200×800 再用 `drawContainWhite()`/`setReference()` 等比置中放上畫布；emoji 線稿與照片直接用畫布尺寸原生生成。`fitCanvas` 無縮放上限（畫布佔滿 stage）。向量縮圖 `tc.scale(300/1200,200/800)` 用固定基準（勿改回 W/H，直式會歪）。
 
 **JS 區段**：
 | 區段 | 重點符號 |
@@ -46,6 +48,7 @@
 | 線稿轉換引擎 | `boxBlur()`、`dilateMask()`、`toLineArt(src, "flat"|"photo", opts)`、`renderEmojiCanvas()`、`emojiColoringPage()` |
 | 手繪線稿 | `P` 繪圖工具（circle/ellipse/poly/seg/dot/arc/curve/qcurve/**blob 平滑閉合曲線**）+ 共用元件（drawHeart/star5/snowflake/musicNote/devilHead）+ **場景元件庫**（rrect/pageFrame 雙線外框/cloud/sunRays/hills/bunting 彩旗/flowerS/flowerStem/treeS/grass）；`VECTOR_SETS` 五系列各 10 張：經典場景 `PAGES`、甜酷小惡魔 `PAGES_DEVIL`、口袋小怪獸 `PAGES_MON`、冰雪王國 `PAGES_ICE`、動物城市 `PAGES_CITY`。**每張構成＝pageFrame 外框 + 背景場景 + 主體細分區塊 + 散景**（2026-07-08 全部重畫，每張線條像素 8-13 萬、可著色區域 30-60 塊）；場景內容須落在內框 60..1140×60..740 內 |
 | 著色圖庫 | `EMOJI_PAGE_SETS`（6 分類 403 個主角）+ 執行期 ZWJ/去重過濾、`TOTAL_PAGES=453` |
+| 素描臨摹 | `#refBoard` 參考層 + `makeFaint()`（線稿→淡灰線透明底）+ `setReference()`/`clearReference()`/`applyRefStyle()` + 狀態 `refActive/refVisible/refOpacity` + `#sketchCtrl`（濃淡滑桿/隱藏/移除）；`SKETCH_SETS`（人物/動物 emoji + 3 個手繪角色系列）+ `renderSketchTab()` + `loadSketchVector/loadSketchEmoji/startSketch`（清空 board→setReference→設鉛筆）。參考層只是底圖：**不進復原快照、不被 floodFill 讀取**；載入著色頁/emoji/照片會 `clearReference()`；`compositeCanvas` 匯出時若參考顯示中會依 `refOpacity` 一起合成。清除鈕只清 board 保留參考（方便重畫） |
 | 隨機場景構圖 | `composeEmojiScene(em)`（2026-07-08）：emoji 主角每次載入都生成**不同**構圖 — 主角大小/位置隨機、隨機 2-3 個同類配角佔角落槽、其餘角落放隨機向量裝飾（`sceneCorner`/`sceneGround`）、外框樣式/彩旗/側邊散景全隨機；emoji 層一次光柵化+`toLineArt` 後再疊向量場景線。頂列「換構圖」鈕（`btnShuffle`）：有 `lastEmojiSubject` 就同主角重骰，否則隨機挑主角 |
 | 著色分頁 | `renderColoringTab()`（向量分頁 → emoji 分頁 → 照片分頁）、縮圖泵 `queueThumb()`/`thumbChannel`（MessageChannel）、`thumbCache`、`loadVectorPage(setName,i)` |
 | 照片變線稿 | **全自動區域分割** `photoToColoring(src, preset)`：`kmeansLabels()` 色彩量化 → 相近色標籤合併（防漸層等高線）→ `mergeSmallRegions()` 碎屑併入鄰居 → 封閉色塊邊界 + 高門檻 Sobel 細節線（16×16 高密度區塊自動抑制，防紋理切碎）；1200×800 全解析度；三 preset：simple/standard/fine |
@@ -60,7 +63,7 @@
 2. **復原快照 = 離屏 canvas + 同步 restore**。不要改回 `toDataURL`（同步 PNG 編碼會讓每次下筆卡 50–250ms），也不要用非同步 `Image.onload` 還原（快按復原會競態）。
 3. **油漆桶順序**：先 `snapshotCanvas()` → `floodFill()` → **成功才** `pushUndo(before)`；失敗給 toast。順序反了會把無效點擊塞進復原堆疊並清掉重做紀錄。
 4. **`fitCanvas` 開頭的尺寸守衛與 `ResizeObserver` 不能移除**：隱藏視窗載入時容器尺寸可能為 0，算出負縮放設進 CSS 會被靜默忽略、畫面爆版。
-5. **縮圖生成只能走 MessageChannel 泵**（`thumbChannel`）：隱藏分頁的 setTimeout 被節流到約 1 次/分，MessageChannel 微任務不受節流。每輪預算 ≤24ms。
+5. **縮圖生成只能走 MessageChannel 泵**（`thumbChannel`）：隱藏分頁的 setTimeout 被節流到約 1 次/分，MessageChannel 微任務不受節流。每輪預算 ≤24ms。`thumbCache` 存離屏主 canvas，**進卡片一律用 `thumbNode()` 複製**（canvas DOM 節點只能有一個父層；著色本與素描共用同組 key，直接 appendChild 會互相搬走縮圖變空白。canvas 不能 cloneNode，要 drawImage）。
 6. **縮圖預熱只在第一次打開著色本時啟動**（在 `openDrawer` 內），不要搬回頁面啟動時（會在使用者剛開始畫圖時佔滿主執行緒約 9 秒 + 常駐 40MB）。
 7. **分類鍵含 emoji 前綴是資料鍵**（如 `"🐾 動物王國"`），顯示時用 `tabLabel()` 去前綴。改鍵名要同步改 `CLASSIC_TAB`/`PHOTO_TAB`/`currentColorTab` 與所有引用。
 8. **彩色 emoji `fillText` 光柵化很貴**（約 15–20ms/字），且成本遞延到第一次 `getImageData` 才爆出來 — profiling 時別誤判成像素迴圈慢。
@@ -120,3 +123,4 @@ ev("pointerdown",100,700); ev("pointermove",200,720); ev("pointerup",200,720);
 - 2026-07-05（二）：照片變線稿重寫為**全自動區域分割**（v1 的開放輪廓會漏色、調滑桿也救不回，故整個換掉並移除滑桿）；新增四個原創主題系列各 10 張（甜酷小惡魔/口袋小怪獸/冰雪王國/動物城市 — 使用者原本要求庫洛米/寶可夢/冰雪奇緣/動物方城市，因版權改原創致敬）；移除表情臉譜 emoji 分類（使用者要求）；油漆桶吸附修正反鋸齒漸層帶問題。
 - 2026-07-08：使用者反映「畫布不夠大、線稿太單調」→ (a) 畫布最大化：直式螢幕改用直式 800×1200 畫布、移除縮放上限、手機版調色盤改單列橫捲；(b) **50 張手繪線稿全部重畫**：新增場景元件庫（pageFrame 外框/雲/太陽/山丘/彩旗/花樹草），每張改為「外框+背景場景+主體細分+散景」構成，線條密度提升約 5 倍。
 - 2026-07-08（二）：emoji 著色圖升級為**隨機場景構圖**（`composeEmojiScene`）— 使用者要求「按下去會不斷更換圖案、不要一模一樣」；同一主角每次載入皆為不同構圖，並新增頂列「換構圖」鈕。
+- 2026-07-09：新增**素描臨摹**（`#refBoard` 參考層）— 使用者要求「卡通人物的素描畫板」；選角色→畫布浮現淡灰參考線→用鉛筆描。為此把 `#board` 背景改透明、畫紙底色移到 `#canvasWrap`，並修正向量縮圖在直式畫布會歪的縮放基準。
