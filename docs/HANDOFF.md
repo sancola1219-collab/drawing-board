@@ -45,7 +45,8 @@
 | 印章 | `placeStamp()`、`STAMP_SETS`（196 emoji、6 分類） |
 | 線稿轉換引擎 | `boxBlur()`、`dilateMask()`、`toLineArt(src, "flat"|"photo", opts)`、`renderEmojiCanvas()`、`emojiColoringPage()` |
 | 手繪線稿 | `P` 繪圖工具（circle/ellipse/poly/seg/dot/arc/curve/qcurve/**blob 平滑閉合曲線**）+ 共用元件（drawHeart/star5/snowflake/musicNote/devilHead）+ **場景元件庫**（rrect/pageFrame 雙線外框/cloud/sunRays/hills/bunting 彩旗/flowerS/flowerStem/treeS/grass）；`VECTOR_SETS` 五系列各 10 張：經典場景 `PAGES`、甜酷小惡魔 `PAGES_DEVIL`、口袋小怪獸 `PAGES_MON`、冰雪王國 `PAGES_ICE`、動物城市 `PAGES_CITY`。**每張構成＝pageFrame 外框 + 背景場景 + 主體細分區塊 + 散景**（2026-07-08 全部重畫，每張線條像素 8-13 萬、可著色區域 30-60 塊）；場景內容須落在內框 60..1140×60..740 內 |
-| 著色圖庫 | `EMOJI_PAGE_SETS`（6 分類 403 張）+ 執行期 ZWJ/去重過濾、`TOTAL_PAGES=453` |
+| 著色圖庫 | `EMOJI_PAGE_SETS`（6 分類 403 個主角）+ 執行期 ZWJ/去重過濾、`TOTAL_PAGES=453` |
+| 隨機場景構圖 | `composeEmojiScene(em)`（2026-07-08）：emoji 主角每次載入都生成**不同**構圖 — 主角大小/位置隨機、隨機 2-3 個同類配角佔角落槽、其餘角落放隨機向量裝飾（`sceneCorner`/`sceneGround`）、外框樣式/彩旗/側邊散景全隨機；emoji 層一次光柵化+`toLineArt` 後再疊向量場景線。頂列「換構圖」鈕（`btnShuffle`）：有 `lastEmojiSubject` 就同主角重骰，否則隨機挑主角 |
 | 著色分頁 | `renderColoringTab()`（向量分頁 → emoji 分頁 → 照片分頁）、縮圖泵 `queueThumb()`/`thumbChannel`（MessageChannel）、`thumbCache`、`loadVectorPage(setName,i)` |
 | 照片變線稿 | **全自動區域分割** `photoToColoring(src, preset)`：`kmeansLabels()` 色彩量化 → 相近色標籤合併（防漸層等高線）→ `mergeSmallRegions()` 碎屑併入鄰居 → 封閉色塊邊界 + 高門檻 Sobel 細節線（16×16 高密度區塊自動抑制，防紋理切碎）；1200×800 全解析度；三 preset：simple/standard/fine |
 | 畫布事件 | pointerdown/move/up：hand=平移 stage、bucket、stamp、筆刷；`endStroke()` |
@@ -118,3 +119,4 @@ ev("pointerdown",100,700); ev("pointermove",200,720); ev("pointerup",200,720);
 - 2026-07-05 質感改版：整體改為深色高級質感（使用者不要可愛風），emoji 按鈕全面換成 SVG 線條圖示，文案去語氣詞。**功能與引擎不變，只動皮膚與文案。**
 - 2026-07-05（二）：照片變線稿重寫為**全自動區域分割**（v1 的開放輪廓會漏色、調滑桿也救不回，故整個換掉並移除滑桿）；新增四個原創主題系列各 10 張（甜酷小惡魔/口袋小怪獸/冰雪王國/動物城市 — 使用者原本要求庫洛米/寶可夢/冰雪奇緣/動物方城市，因版權改原創致敬）；移除表情臉譜 emoji 分類（使用者要求）；油漆桶吸附修正反鋸齒漸層帶問題。
 - 2026-07-08：使用者反映「畫布不夠大、線稿太單調」→ (a) 畫布最大化：直式螢幕改用直式 800×1200 畫布、移除縮放上限、手機版調色盤改單列橫捲；(b) **50 張手繪線稿全部重畫**：新增場景元件庫（pageFrame 外框/雲/太陽/山丘/彩旗/花樹草），每張改為「外框+背景場景+主體細分+散景」構成，線條密度提升約 5 倍。
+- 2026-07-08（二）：emoji 著色圖升級為**隨機場景構圖**（`composeEmojiScene`）— 使用者要求「按下去會不斷更換圖案、不要一模一樣」；同一主角每次載入皆為不同構圖，並新增頂列「換構圖」鈕。
